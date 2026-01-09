@@ -4,10 +4,12 @@ import 'register_doctor.dart';
 import 'register_seller.dart';
 
 class RoleSelectScreen extends StatelessWidget {
+  const RoleSelectScreen({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFE2E8F0), // App Background
+      backgroundColor: const Color(0xFFE2E8F0), // App Background
       body: Padding(
         padding: const EdgeInsets.all(25.0),
         child: Center(
@@ -17,19 +19,19 @@ class RoleSelectScreen extends StatelessWidget {
               children: [
 
                 // Logo + Title
-                SizedBox(height: 40),
-                Icon(Icons.spa, size: 80, color: Color(0xFF1A4D2E)), // Deep Forest Green
+                const SizedBox(height: 40),
+                const Icon(Icons.spa, size: 80, color: Color(0xFF1A4D2E)),
 
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 RichText(
-                  text: TextSpan(
+                  text: const TextSpan(
                     children: [
                       TextSpan(
                         text: "AyurVeda",
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1F2937), // Main Text
+                          color: Color(0xFF1F2937),
                         ),
                       ),
                       TextSpan(
@@ -37,90 +39,99 @@ class RoleSelectScreen extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFFFFB347), // Warm Gold
+                          color: Color(0xFFFFB347),
                         ),
                       ),
                     ],
                   ),
                 ),
 
-                SizedBox(height: 5),
-                Text(
+                const SizedBox(height: 5),
+                const Text(
                   "Tradition meets Technology",
-                  style: TextStyle(color: Color(0xFF6B7280)), // Sub Text
+                  style: TextStyle(color: Color(0xFF6B7280)),
                 ),
 
-                SizedBox(height: 40),
-                Text(
+                const SizedBox(height: 40),
+                const Text(
                   "SELECT YOUR ROLE TO LOGIN",
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1F2937)),
                 ),
 
-                SizedBox(height: 30),
+                const SizedBox(height: 30),
 
                 // Patient Card
                 roleCard(
                   icon: Icons.person,
                   title: "Patient",
                   subtitle: "Find treatments & doctors",
-                  iconColor: Color(0xFF1A4D2E), // Deep Forest Green
-                  backgroundColor: Color(0xFFF0FDF4), // Soft Green Bg
-                  titleColor: Color(0xFF1F2937),
-                  subtitleColor: Color(0xFF6B7280),
+                  iconColor: const Color(0xFF1A4D2E),
+                  backgroundColor: const Color(0xFFF0FDF4),
+                  titleColor: const Color(0xFF1F2937),
+                  subtitleColor: const Color(0xFF6B7280),
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => RegisterPatient()),
+                    MaterialPageRoute(
+                      builder: (_) => const RegisterPatientScreen(),
+                    ),
                   ),
                 ),
 
-                SizedBox(height: 15),
+                const SizedBox(height: 15),
 
                 // Doctor Card
                 roleCard(
                   icon: Icons.medical_services,
                   title: "Doctor",
                   subtitle: "Manage appointments",
-                  iconColor: Color(0xFF3B82F6), // Medical Blue
-                  backgroundColor: Color(0xFFE8F0FE), // Light Blue
-                  titleColor: Color(0xFF1F2937),
-                  subtitleColor: Color(0xFF6B7280),
+                  iconColor: const Color(0xFF3B82F6),
+                  backgroundColor: const Color(0xFFE8F0FE),
+                  titleColor: const Color(0xFF1F2937),
+                  subtitleColor: const Color(0xFF6B7280),
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => RegisterDoctor()),
+                    MaterialPageRoute(
+                      builder: (_) => RegisterDoctor(), // ❌ no const here
+                    ),
                   ),
                 ),
 
-                SizedBox(height: 15),
+                const SizedBox(height: 15),
 
                 // Seller Card
                 roleCard(
                   icon: Icons.store,
                   title: "Seller",
                   subtitle: "Manage shop & orders",
-                  iconColor: Color(0xFFFF9F29), // Vibrant Orange
-                  backgroundColor: Color(0xFFFFF7ED), // Orange Bg
-                  titleColor: Color(0xFF1F2937),
-                  subtitleColor: Color(0xFF6B7280),
+                  iconColor: const Color(0xFFFF9F29),
+                  backgroundColor: const Color(0xFFFFF7ED),
+                  titleColor: const Color(0xFF1F2937),
+                  subtitleColor: const Color(0xFF6B7280),
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => RegisterSeller()),
+                    MaterialPageRoute(
+                      builder: (_) => RegisterSeller(), // ❌ no const here
+                    ),
                   ),
                 ),
 
-                SizedBox(height: 30),
+                const SizedBox(height: 30),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF1A4D2E), // Deep Forest Green
-                    padding: EdgeInsets.symmetric(horizontal: 60, vertical: 15),
+                    backgroundColor: const Color(0xFF1A4D2E),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 60, vertical: 15),
                   ),
                   onPressed: () {},
-                  child: Text("Login securely", style: TextStyle(fontSize: 18)),
+                  child: const Text("Login securely", style: TextStyle(fontSize: 18)),
                 ),
 
-                SizedBox(height: 15),
-                Text(
+                const SizedBox(height: 15),
+                const Text(
                   "Don't have an account? Register",
-                  style: TextStyle(color: Color(0xFFFF9F29)), // Vibrant Orange
+                  style: TextStyle(color: Color(0xFFFF9F29)),
                 )
               ],
             ),
@@ -145,7 +156,7 @@ Widget roleCard({
   return InkWell(
     onTap: () => onTap(),
     child: Container(
-      padding: EdgeInsets.all(18),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(15),
@@ -154,11 +165,15 @@ Widget roleCard({
       child: Row(
         children: [
           Icon(icon, size: 30, color: iconColor),
-          SizedBox(width: 15),
+          const SizedBox(width: 15),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: titleColor)),
               Text(subtitle, style: TextStyle(color: subtitleColor)),
             ],
           )
