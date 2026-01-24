@@ -17,17 +17,18 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      debugShowCheckedModeBanner: false, // Remove debug banner
+      title: 'AyurVedaCare',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true, // Optional: enable Material 3
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+        useMaterial3: true,
       ),
       home: const RoleSelectScreen(),
     );
   }
 }
 
-// Optional: Keep your MyHomePage widget if you still use it elsewhere
+// Optional: Keep MyHomePage for testing or legacy screens
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
 

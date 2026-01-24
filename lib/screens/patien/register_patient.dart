@@ -1,16 +1,17 @@
+// lib/screens/patien/register_patient.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'otp_screen.dart';
+import '../patien/otp_screen.dart';
 
-class RegisterPatientScreen extends StatefulWidget {
-  const RegisterPatientScreen({Key? key}) : super(key: key);
+class RegisterPatient extends StatefulWidget {
+  const RegisterPatient({Key? key}) : super(key: key);
 
   @override
-  State<RegisterPatientScreen> createState() => _RegisterPatientScreenState();
+  State<RegisterPatient> createState() => _RegisterPatientState();
 }
 
-class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
+class _RegisterPatientState extends State<RegisterPatient> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -20,7 +21,6 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Function to register patient
   Future<void> registerPatient() async {
     if (emailController.text.isEmpty ||
         usernameController.text.isEmpty ||
@@ -50,11 +50,11 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // 3️⃣ Send email verification (acts as OTP)
+      // 3️⃣ Send email verification
       await userCredential.user!.sendEmailVerification();
 
       // 4️⃣ Navigate to OTP screen
-      Navigator.push(
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => OtpScreen(email: emailController.text.trim()),
@@ -107,7 +107,6 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
               ),
             ),
             const SizedBox(height: 30),
-
             // Email
             TextField(
               controller: emailController,
@@ -121,7 +120,6 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
             // Username
             TextField(
               controller: usernameController,
@@ -134,7 +132,6 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
             // Password
             TextField(
               controller: passwordController,
@@ -148,7 +145,6 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
               ),
             ),
             const SizedBox(height: 30),
-
             // Register Button
             SizedBox(
               width: double.infinity,
