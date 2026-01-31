@@ -1,8 +1,7 @@
-// lib/screens/patien/register_patient.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../patien/otp_screen.dart';
+import '../home/home.dart';
 
 class RegisterPatient extends StatefulWidget {
   const RegisterPatient({Key? key}) : super(key: key);
@@ -12,157 +11,175 @@ class RegisterPatient extends StatefulWidget {
 }
 
 class _RegisterPatientState extends State<RegisterPatient> {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController usernameController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  bool isLogin = false;
+  bool loading = false;
 
-  bool isLoading = false;
+  final emailController = TextEditingController();
+  final usernameController = TextEditingController();
+  final passwordController = TextEditingController();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // ================= REGISTER =================
   Future<void> registerPatient() async {
     if (emailController.text.isEmpty ||
         usernameController.text.isEmpty ||
         passwordController.text.isEmpty) {
-      showMessage("All fields are required");
+      showMsg("All fields are required");
       return;
     }
 
-    setState(() => isLoading = true);
+    setState(() => loading = true);
 
     try {
-      // 1️⃣ Create user in Firebase Auth
-      UserCredential userCredential =
-          await _auth.createUserWithEmailAndPassword(
+      final cred = await _auth.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
-      // 2️⃣ Save extra info in Firestore
-      await _firestore
-          .collection('patients')
-          .doc(userCredential.user!.uid)
-          .set({
-        'username': usernameController.text.trim(),
+      // Send verification email (ONLY HERE)
+      await cred.user!.sendEmailVerification();
+
+      // Save patient data
+      await _firestore.collection('patients').doc(cred.user!.uid).set({
         'email': emailController.text.trim(),
+        'username': usernameController.text.trim(),
         'role': 'patient',
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // 3️⃣ Send email verification
-      await userCredential.user!.sendEmailVerification();
+      showMsg("Verification email sent. Please verify and login.");
 
-      // 4️⃣ Navigate to OTP screen
+      setState(() => isLogin = true);
+    } on FirebaseAuthException catch (e) {
+      showMsg(e.message ?? "Registration failed");
+    } finally {
+      setState(() => loading = false);
+    }
+  }
+
+  // ================= LOGIN =================
+  Future<void> loginPatient() async {
+    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+      showMsg("Email/Username and password required");
+      return;
+    }
+
+    setState(() => loading = true);
+
+    try {
+      String loginInput = emailController.text.trim();
+
+      // If username → get email
+      if (!loginInput.contains('@')) {
+        final snap = await _firestore
+            .collection('patients')
+            .where('username', isEqualTo: loginInput)
+            .limit(1)
+            .get();
+
+        if (snap.docs.isEmpty) {
+          throw "Username not found";
+        }
+
+        loginInput = snap.docs.first['email'];
+      }
+
+      await _auth.signInWithEmailAndPassword(
+        email: loginInput,
+        password: passwordController.text.trim(),
+      );
+
+      // 🚫 NO emailVerified check here (IMPORTANT)
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => OtpScreen(email: emailController.text.trim()),
+          builder: (_) => HomePage(role: 'patient'),
         ),
       );
-
-      showMessage("Verification email sent. Please check your inbox.");
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'email-already-in-use') {
-        showMessage('Email is already in use');
-      } else if (e.code == 'invalid-email') {
-        showMessage('Invalid email address');
-      } else if (e.code == 'weak-password') {
-        showMessage('Password is too weak');
-      } else {
-        showMessage('Error: ${e.message}');
-      }
     } catch (e) {
-      showMessage('Registration failed');
-      print(e);
+      showMsg(e.toString());
+    } finally {
+      setState(() => loading = false);
     }
-
-    setState(() => isLoading = false);
   }
 
-  void showMessage(String msg) {
+  void showMsg(String msg) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE2E8F0),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text("Patient Registration"),
+        title: Text(isLogin ? "Patient Login" : "Patient Register"),
         backgroundColor: const Color(0xFF1A4D2E),
       ),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(height: 20),
-            const Text(
-              "Create Patient Account",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+            if (!isLogin)
+              TextField(
+                controller: usernameController,
+                decoration: const InputDecoration(
+                  labelText: "Username",
+                  prefixIcon: Icon(Icons.person),
+                ),
               ),
-            ),
-            const SizedBox(height: 30),
-            // Email
+            if (!isLogin) const SizedBox(height: 16),
+
             TextField(
               controller: emailController,
-              keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
-                labelText: "Email",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                labelText: isLogin ? "Email or Username" : "Email",
                 prefixIcon: const Icon(Icons.email),
               ),
             ),
-            const SizedBox(height: 20),
-            // Username
-            TextField(
-              controller: usernameController,
-              decoration: InputDecoration(
-                labelText: "Username",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.person),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Password
+            const SizedBox(height: 16),
+
             TextField(
               controller: passwordController,
               obscureText: true,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: "Password",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.lock),
+                prefixIcon: Icon(Icons.lock),
               ),
             ),
-            const SizedBox(height: 30),
-            // Register Button
+            const SizedBox(height: 24),
+
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
+                onPressed: loading
+                    ? null
+                    : isLogin
+                        ? loginPatient
+                        : registerPatient,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1A4D2E),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
                 ),
-                onPressed: isLoading ? null : registerPatient,
-                child: isLoading
+                child: loading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        "Send OTP",
-                        style: TextStyle(fontSize: 16),
-                      ),
+                    : Text(isLogin ? "Login" : "Register"),
+              ),
+            ),
+
+            TextButton(
+              onPressed: () {
+                setState(() => isLogin = !isLogin);
+              },
+              child: Text(
+                isLogin
+                    ? "Don't have an account? Register"
+                    : "Already have an account? Login",
               ),
             ),
           ],

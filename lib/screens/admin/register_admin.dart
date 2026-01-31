@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'admin_dashboard.dart';
+import '../home/home.dart'; // Home page handles dashboard selection
 
 class RegisterAdmin extends StatefulWidget {
   const RegisterAdmin({Key? key}) : super(key: key);
@@ -23,8 +23,7 @@ class _RegisterAdminState extends State<RegisterAdmin> {
   final TextEditingController loginPasswordController = TextEditingController();
 
   bool loading = false;
-  bool showLoginForm = false; // To toggle between register & login
-
+  bool showLoginForm = false;
   final Color primaryGreen = const Color(0xFF24615E);
 
   @override
@@ -46,8 +45,9 @@ class _RegisterAdminState extends State<RegisterAdmin> {
     try {
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
-              email: emailController.text.trim(),
-              password: passwordController.text.trim());
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
 
       String uid = userCredential.user!.uid;
 
@@ -63,9 +63,12 @@ class _RegisterAdminState extends State<RegisterAdmin> {
         const SnackBar(content: Text("Admin Registered Successfully!")),
       );
 
+      // Navigate to HomePage with role
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const AdminDashboard()),
+        MaterialPageRoute(
+          builder: (_) => HomePage(role: "admin"),
+        ),
       );
     } on FirebaseAuthException catch (e) {
       String message = "";
@@ -92,12 +95,26 @@ class _RegisterAdminState extends State<RegisterAdmin> {
     try {
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(
-              email: loginEmailController.text.trim(),
-              password: loginPasswordController.text.trim());
+        email: loginEmailController.text.trim(),
+        password: loginPasswordController.text.trim(),
+      );
 
+      String uid = userCredential.user!.uid;
+
+      // Get role from Firestore
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection("admins") // If all users are in one collection, adjust
+          .doc(uid)
+          .get();
+
+      String role = userDoc['role'];
+
+      // Navigate to HomePage with role
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const AdminDashboard()),
+        MaterialPageRoute(
+          builder: (_) => HomePage(role: role),
+        ),
       );
     } on FirebaseAuthException catch (e) {
       String message = "";
@@ -142,12 +159,8 @@ class _RegisterAdminState extends State<RegisterAdmin> {
                   style: const TextStyle(fontSize: 14, color: Colors.grey),
                 ),
                 const SizedBox(height: 24),
-
-                // Show either registration or login form
                 showLoginForm ? loginForm() : registrationForm(),
-
                 const SizedBox(height: 16),
-                // Toggle button
                 Center(
                   child: TextButton(
                     onPressed: () {
@@ -160,8 +173,7 @@ class _RegisterAdminState extends State<RegisterAdmin> {
                           ? "Don't have an account? Register"
                           : "Already have an account? Login",
                       style: TextStyle(
-                          color: primaryGreen,
-                          fontWeight: FontWeight.bold),
+                          color: primaryGreen, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -208,11 +220,13 @@ class _RegisterAdminState extends State<RegisterAdmin> {
               onPressed: loading ? null : submit,
               child: loading
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("Register Admin",
+                  : const Text(
+                      "Register Admin",
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white)),
+                          color: Colors.white),
+                    ),
             ),
           ),
         ],
@@ -250,11 +264,13 @@ class _RegisterAdminState extends State<RegisterAdmin> {
               onPressed: loading ? null : login,
               child: loading
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("Login",
+                  : const Text(
+                      "Login",
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white)),
+                          color: Colors.white),
+                    ),
             ),
           ),
         ],

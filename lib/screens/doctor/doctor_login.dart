@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'doctor_dashboard.dart'; // <-- your doctor dashboard screen
 import '../../constants/colors.dart';
+import '../home/home.dart';
 
 class DoctorLoginScreen extends StatefulWidget {
   const DoctorLoginScreen({super.key});
@@ -14,7 +14,6 @@ class DoctorLoginScreen extends StatefulWidget {
 class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-
   bool loading = false;
 
   final Color headerBgColor = const Color(0xFFE9EFEE);
@@ -51,10 +50,10 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
         if (data['status'] != 'approved') {
           show("Your account is not approved yet");
         } else {
-          // Navigate to Doctor Dashboard
+          // Navigate to HomePage with role
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const DoctorDashboard()),
+            MaterialPageRoute(builder: (_) => HomePage(role: 'doctor')),
           );
         }
       }

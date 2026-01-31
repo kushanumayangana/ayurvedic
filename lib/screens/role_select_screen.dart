@@ -1,8 +1,10 @@
+
 import 'package:flutter/material.dart';
 import 'patien/register_patient.dart';
-import 'seller/register_seller.dart';
+import 'seller/seller1.dart';
 import 'doctor/docter1.dart';
 import 'admin/register_admin.dart';
+import 'home/home.dart';
 
 class RoleSelectScreen extends StatelessWidget {
   const RoleSelectScreen({Key? key}) : super(key: key);
@@ -18,16 +20,10 @@ class RoleSelectScreen extends StatelessWidget {
             child: Column(
               children: [
                 const SizedBox(height: 40),
-                
-                // Hero Section
                 _buildHeroSection(),
                 const SizedBox(height: 48),
-                
-                // Role Cards Grid
                 _buildRoleCardsGrid(context),
                 const SizedBox(height: 32),
-                
-                // Footer Text
                 _buildFooterText(),
                 const SizedBox(height: 40),
               ],
@@ -38,6 +34,7 @@ class RoleSelectScreen extends StatelessWidget {
     );
   }
 
+  // ---------------- HERO ----------------
   Widget _buildHeroSection() {
     return Column(
       children: [
@@ -60,11 +57,7 @@ class RoleSelectScreen extends StatelessWidget {
             ],
           ),
           child: const Center(
-            child: Icon(
-              Icons.eco,
-              color: Colors.white,
-              size: 48,
-            ),
+            child: Icon(Icons.eco, color: Colors.white, size: 48),
           ),
         ),
         const SizedBox(height: 24),
@@ -74,7 +67,6 @@ class RoleSelectScreen extends StatelessWidget {
             fontSize: 32,
             fontWeight: FontWeight.bold,
             color: Color(0xFF0F172A),
-            letterSpacing: 0.5,
           ),
         ),
         const SizedBox(height: 12),
@@ -94,6 +86,7 @@ class RoleSelectScreen extends StatelessWidget {
     );
   }
 
+  // ---------------- ROLES ----------------
   Widget _buildRoleCardsGrid(BuildContext context) {
     final roles = [
       RoleData(
@@ -133,7 +126,7 @@ class RoleSelectScreen extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [Color(0xFFFEF3C7), Color(0xFFFFFBEB)],
         ),
-        page: const RegisterSellerScreen(),
+        page: const SellerRegisterStep1(),
       ),
       RoleData(
         title: 'Admin',
@@ -162,6 +155,7 @@ class RoleSelectScreen extends StatelessWidget {
     );
   }
 
+  // ---------------- CARD ----------------
   Widget _buildRoleCard(BuildContext context, RoleData role) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -170,12 +164,8 @@ class RoleSelectScreen extends StatelessWidget {
           context,
           PageRouteBuilder(
             pageBuilder: (_, __, ___) => role.page,
-            transitionsBuilder: (_, animation, __, child) {
-              return FadeTransition(
-                opacity: animation,
-                child: child,
-              );
-            },
+            transitionsBuilder: (_, animation, __, child) =>
+                FadeTransition(opacity: animation, child: child),
             transitionDuration: const Duration(milliseconds: 300),
           ),
         ),
@@ -196,27 +186,18 @@ class RoleSelectScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: Colors.white.withOpacity(0.5),
-                width: 1,
               ),
             ),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  // Icon Container
                   Container(
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
                       color: role.iconBgColor,
                       borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: role.iconColor.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: Center(
                       child: Icon(
@@ -227,8 +208,6 @@ class RoleSelectScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 20),
-                  
-                  // Text Content
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,38 +223,18 @@ class RoleSelectScreen extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           role.subtitle,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: const Color(0xFF64748B).withOpacity(0.9),
-                            height: 1.4,
+                            color: Color(0xFF64748B),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  
-                  // Arrow Icon
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.8),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 16,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: Color(0xFF64748B),
                   ),
                 ],
               ),
@@ -286,6 +245,7 @@ class RoleSelectScreen extends StatelessWidget {
     );
   }
 
+  // ---------------- FOOTER ----------------
   Widget _buildFooterText() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -296,13 +256,13 @@ class RoleSelectScreen extends StatelessWidget {
           fontSize: 13,
           color: const Color(0xFF64748B).withOpacity(0.7),
           fontStyle: FontStyle.italic,
-          height: 1.6,
         ),
       ),
     );
   }
 }
 
+// ---------------- MODEL ----------------
 class RoleData {
   final String title;
   final String subtitle;
