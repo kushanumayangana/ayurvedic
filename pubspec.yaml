@@ -49,6 +49,7 @@ dependencies:
 
   # URL launcher (open documents in browser / external apps)
   url_launcher: ^6.1.10
+  shared_preferences: ^2.1.1
 
 dev_dependencies:
   flutter_test:

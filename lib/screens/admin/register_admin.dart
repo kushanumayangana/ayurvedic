@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
-import '../home/home.dart'; // Home page handles dashboard selection
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../home/home.dart';
 
 class RegisterAdmin extends StatefulWidget {
   const RegisterAdmin({Key? key}) : super(key: key);
@@ -23,8 +22,10 @@ class _RegisterAdminState extends State<RegisterAdmin> {
   final TextEditingController loginPasswordController = TextEditingController();
 
   bool loading = false;
-  bool showLoginForm = false;
-  final Color primaryGreen = const Color(0xFF24615E);
+  bool showLoginForm = true; // toggle between login and register
+
+  final Color navyBlue = const Color(0xFF1D2671);
+  final Color lightBg = const Color(0xFFE8EEF0);
 
   @override
   void dispose() {
@@ -36,22 +37,23 @@ class _RegisterAdminState extends State<RegisterAdmin> {
     super.dispose();
   }
 
-  // Registration function
+  // ================= REGISTER ADMIN =================
   Future<void> submit() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => loading = true);
 
     try {
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
+      UserCredential userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
 
-      String uid = userCredential.user!.uid;
-
-      await FirebaseFirestore.instance.collection("admins").doc(uid).set({
+      await FirebaseFirestore.instance
+          .collection("admins")
+          .doc(userCredential.user!.uid)
+          .set({
+        "uid": userCredential.user!.uid,
         "fullName": fullNameController.text.trim(),
         "email": emailController.text.trim(),
         "role": "admin",
@@ -59,176 +61,143 @@ class _RegisterAdminState extends State<RegisterAdmin> {
         "createdAt": FieldValue.serverTimestamp(),
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Admin Registered Successfully!")),
-      );
-
-      // Navigate to HomePage with role
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => HomePage(role: "admin"),
-        ),
+        MaterialPageRoute(builder: (_) => const HomePage(role: "admin")),
       );
-    } on FirebaseAuthException catch (e) {
-      String message = "";
-      if (e.code == "email-already-in-use") {
-        message = "This email is already registered";
-      } else if (e.code == "weak-password") {
-        message = "Password should be at least 6 characters";
-      } else {
-        message = e.message ?? "An error occurred";
-      }
+    } catch (e) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+          .showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       setState(() => loading = false);
     }
   }
 
-  // Login function
+  // ================= ADMIN LOGIN =================
   Future<void> login() async {
     if (!_loginFormKey.currentState!.validate()) return;
-
     setState(() => loading = true);
 
     try {
-      UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(
-        email: loginEmailController.text.trim(),
-        password: loginPasswordController.text.trim(),
+      final email = loginEmailController.text.trim();
+      final password = loginPasswordController.text.trim();
+
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
       );
 
-      String uid = userCredential.user!.uid;
+      // OPTIONAL: check email allowlist
+      // final allowedAdmins = ["admin@gmail.com"];
+      // if (!allowedAdmins.contains(email)) throw "Not an admin";
 
-      // Get role from Firestore
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection("admins") // If all users are in one collection, adjust
-          .doc(uid)
-          .get();
-
-      String role = userDoc['role'];
-
-      // Navigate to HomePage with role
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => HomePage(role: role),
-        ),
+        MaterialPageRoute(builder: (_) => const HomePage(role: "admin")),
       );
-    } on FirebaseAuthException catch (e) {
-      String message = "";
-      if (e.code == "user-not-found") {
-        message = "No admin found with this email";
-      } else if (e.code == "wrong-password") {
-        message = "Incorrect password";
-      } else {
-        message = e.message ?? "An error occurred";
-      }
-      show(message);
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       setState(() => loading = false);
     }
   }
 
-  void show(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  showLoginForm ? "Admin Login" : "Admin Registration",
-                  style: const TextStyle(
-                      fontSize: 28, fontWeight: FontWeight.bold),
+      backgroundColor: Colors.white,
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // HEADER
+            Container(
+              width: double.infinity,
+              height: 240,
+              decoration: BoxDecoration(
+                color: lightBg,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(40),
+                  bottomRight: Radius.circular(40),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  showLoginForm
-                      ? "Enter your email and password to login"
-                      : "Fill in the details to create an admin account",
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-                const SizedBox(height: 24),
-                showLoginForm ? loginForm() : registrationForm(),
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton(
-                    onPressed: () {
-                      setState(() {
-                        showLoginForm = !showLoginForm;
-                      });
-                    },
-                    child: Text(
-                      showLoginForm
-                          ? "Don't have an account? Register"
-                          : "Already have an account? Login",
-                      style: TextStyle(
-                          color: primaryGreen, fontWeight: FontWeight.bold),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 40),
+                  Row(
+                    children: [
+                      Icon(Icons.security, color: navyBlue, size: 28),
+                      const SizedBox(width: 8),
+                      Text(
+                        "AyurvedaCare",
+                        style: TextStyle(
+                          color: navyBlue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  Text(
+                    showLoginForm ? "Admin Login" : "Admin Registration",
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: navyBlue,
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+
+            // FORM
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: showLoginForm ? loginForm() : registrationForm(),
+            ),
+
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: () => setState(() => showLoginForm = !showLoginForm),
+              child: RichText(
+                text: TextSpan(
+                  text: showLoginForm
+                      ? "New admin? "
+                      : "Already have an account? ",
+                  style: const TextStyle(color: Colors.grey, fontSize: 14),
+                  children: [
+                    TextSpan(
+                      text: showLoginForm ? "Register" : "Login",
+                      style: TextStyle(
+                          color: navyBlue, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  // ================= FORMS =================
   Widget registrationForm() {
     return Form(
       key: _formKey,
       child: Column(
         children: [
-          _buildTextField(
-              controller: fullNameController,
-              label: "Full Name",
-              validatorMsg: "Please enter full name"),
-          const SizedBox(height: 16),
-          _buildTextField(
-              controller: emailController,
-              label: "Email",
-              keyboardType: TextInputType.emailAddress,
-              validatorMsg: "Please enter a valid email"),
-          const SizedBox(height: 16),
-          _buildTextField(
-              controller: passwordController,
-              label: "Password",
-              obscureText: true,
-              validatorMsg: "Please enter a password"),
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryGreen,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: loading ? null : submit,
-              child: loading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text(
-                      "Register Admin",
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
-                    ),
-            ),
-          ),
+          _buildField(fullNameController, Icons.person, "Full Name"),
+          const SizedBox(height: 20),
+          _buildField(emailController, Icons.email, "Email"),
+          const SizedBox(height: 20),
+          _buildField(passwordController, Icons.lock, "Password", isPass: true),
+          const SizedBox(height: 40),
+          _submitButton("Create Admin", submit),
         ],
       ),
     );
@@ -239,68 +208,44 @@ class _RegisterAdminState extends State<RegisterAdmin> {
       key: _loginFormKey,
       child: Column(
         children: [
-          _buildTextField(
-              controller: loginEmailController,
-              label: "Email",
-              keyboardType: TextInputType.emailAddress,
-              validatorMsg: "Please enter a valid email"),
-          const SizedBox(height: 16),
-          _buildTextField(
-              controller: loginPasswordController,
-              label: "Password",
-              obscureText: true,
-              validatorMsg: "Please enter password"),
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey[700],
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: loading ? null : login,
-              child: loading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text(
-                      "Login",
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
-                    ),
-            ),
-          ),
+          _buildField(loginEmailController, Icons.email, "Email"),
+          const SizedBox(height: 20),
+          _buildField(loginPasswordController, Icons.lock, "Password", isPass: true),
+          const SizedBox(height: 40),
+          _submitButton("Login", login),
         ],
       ),
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    bool obscureText = false,
-    TextInputType keyboardType = TextInputType.text,
-    required String validatorMsg,
-  }) {
+  // ================= HELPERS =================
+  Widget _buildField(TextEditingController controller, IconData icon, String hint,
+      {bool isPass = false}) {
     return TextFormField(
       controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      validator: (val) => val == null || val.isEmpty ? validatorMsg : null,
+      obscureText: isPass,
+      validator: (v) => v == null || v.isEmpty ? "Required" : null,
       decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Colors.grey),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding:
-            const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+        hintText: hint,
+        prefixIcon: Icon(icon),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+      ),
+    );
+  }
+
+  Widget _submitButton(String text, VoidCallback onPressed) {
+    return SizedBox(
+      width: double.infinity,
+      height: 55,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: navyBlue,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         ),
+        onPressed: loading ? null : onPressed,
+        child: loading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : Text(text, style: const TextStyle(color: Colors.white, fontSize: 16)),
       ),
     );
   }

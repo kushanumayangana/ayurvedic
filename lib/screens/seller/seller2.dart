@@ -36,8 +36,9 @@ class _SellerRegisterStep2State extends State<SellerRegisterStep2> {
         FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['jpg', 'png', 'pdf']);
         if (result != null) {
           setState(() {
-            if (type == "br") brCertificateFile = result.files.single.bytes!;
-            if (type == "drug") drugLicenseFile = result.files.single.bytes!;
+            // Keep the PlatformFile so we have filename + bytes
+            if (type == "br") brCertificateFile = result.files.single;
+            if (type == "drug") drugLicenseFile = result.files.single;
           });
         }
       } else {
@@ -55,20 +56,63 @@ class _SellerRegisterStep2State extends State<SellerRegisterStep2> {
   }
 
   Future<String> uploadToCloudinary(dynamic file, String tag) async {
-    final uri = Uri.parse("https://api.cloudinary.com/v1_1/dcbyjbtbc/image/upload");
-    final request = http.MultipartRequest("POST", uri)
-      ..fields["upload_preset"] = "seller_upload"
-      ..fields["folder"] = "sellers";
+    // Determine URI and content-type based on file extension (pdf -> raw)
+    Uri uri = Uri.parse("https://api.cloudinary.com/v1_1/dcbyjbtbc/image/upload");
+    String resourceType = "image";
 
-    if (kIsWeb) {
-      request.files.add(http.MultipartFile.fromBytes("file", file as Uint8List, filename: "file.jpg", contentType: MediaType("image", "jpeg")));
-    } else {
-      request.files.add(await http.MultipartFile.fromPath("file", (file as File).path));
+    try {
+      // We need filename and bytes/path to decide endpoint and content type
+      String? filename;
+      MediaType? contentType;
+      List<int>? bytes;
+      String? filePath;
+
+      if (kIsWeb) {
+        final pf = file as PlatformFile;
+        filename = pf.name;
+        bytes = pf.bytes?.toList();
+        final nameLower = filename.toLowerCase();
+        if (nameLower.endsWith('.pdf')) {
+          uri = Uri.parse("https://api.cloudinary.com/v1_1/dcbyjbtbc/raw/upload");
+          resourceType = 'raw';
+        }
+        contentType = filename.endsWith('.png')
+            ? MediaType('image', 'png')
+            : (filename.endsWith('.pdf') ? MediaType('application', 'pdf') : MediaType('image', 'jpeg'));
+      } else {
+        final ioFile = file as File;
+        filePath = ioFile.path;
+        filename = ioFile.path.split(Platform.pathSeparator).last;
+        final nameLower = filename.toLowerCase();
+        if (nameLower.endsWith('.pdf')) {
+          uri = Uri.parse("https://api.cloudinary.com/v1_1/dcbyjbtbc/raw/upload");
+          resourceType = 'raw';
+        }
+        contentType = filename.endsWith('.png')
+            ? MediaType('image', 'png')
+            : (filename.endsWith('.pdf') ? MediaType('application', 'pdf') : MediaType('image', 'jpeg'));
+      }
+
+      final request = http.MultipartRequest('POST', uri);
+      request.fields['upload_preset'] = 'seller_upload';
+      request.fields['folder'] = 'sellers';
+      if (resourceType == 'raw') request.fields['resource_type'] = 'raw';
+
+      if (kIsWeb) {
+        if (bytes == null) throw Exception('No file bytes available');
+        request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename, contentType: contentType));
+      } else {
+        request.files.add(await http.MultipartFile.fromPath('file', filePath!, contentType: contentType));
+      }
+
+      // send with timeout to avoid hanging
+      final response = await request.send().timeout(const Duration(seconds: 60));
+      final respStr = await response.stream.bytesToString();
+      if (response.statusCode == 200) return jsonDecode(respStr)['secure_url'];
+      throw Exception('Upload Failed: ${response.statusCode} - $respStr');
+    } catch (e) {
+      rethrow;
     }
-    final response = await request.send();
-    final respStr = await response.stream.bytesToString();
-    if (response.statusCode == 200) return jsonDecode(respStr)["secure_url"];
-    throw Exception("Upload Failed");
   }
 
   Future<void> submitApplication() async {

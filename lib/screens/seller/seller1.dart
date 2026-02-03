@@ -55,6 +55,8 @@ class _SellerRegisterStep1State extends State<SellerRegisterStep1> {
         password: passwordController.text.trim(),
       );
       User user = cred.user!;
+      
+      // Create seller document with uid as both document ID and field
       await FirebaseFirestore.instance.collection('sellers').doc(user.uid).set({
         'uid': user.uid,
         'ownerName': ownerNameController.text.trim(),

@@ -63,6 +63,7 @@ class DoctorApprovalDetail extends StatelessWidget {
                           backgroundColor: Colors.green),
                       onPressed: () async {
                         await doctors.doc(docId).update({'status': 'approved'});
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text("Doctor approved")),
                         );
@@ -75,6 +76,7 @@ class DoctorApprovalDetail extends StatelessWidget {
                           backgroundColor: Colors.red),
                       onPressed: () async {
                         await doctors.doc(docId).update({'status': 'rejected'});
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text("Doctor rejected")),
                         );
@@ -102,12 +104,12 @@ class DoctorApprovalDetail extends StatelessWidget {
           onTap: () {
             // Open in browser or full-screen image viewer
           },
-          child: Image.network(
+            child: Image.network(
             url,
             height: 150,
             width: double.infinity,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
+            errorBuilder: (context, error, stackTrace) =>
                 const Text("Failed to load image"),
           ),
         ),
