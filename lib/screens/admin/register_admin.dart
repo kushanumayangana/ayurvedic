@@ -42,32 +42,73 @@ class _RegisterAdminState extends State<RegisterAdmin> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => loading = true);
 
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+    final fullName = fullNameController.text.trim();
+
+    // ✅ Client-side validation
+    if (!email.contains("@")) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Invalid email")));
+      setState(() => loading = false);
+      return;
+    }
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Password too short")));
+      setState(() => loading = false);
+      return;
+    }
+
     try {
+      // Create Firebase Auth user
       UserCredential userCredential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+        email: email,
+        password: password,
       );
 
+      // Save admin info in Firestore (use users collection for rules)
       await FirebaseFirestore.instance
-          .collection("admins")
+          .collection("users") // important for rules
           .doc(userCredential.user!.uid)
           .set({
         "uid": userCredential.user!.uid,
-        "fullName": fullNameController.text.trim(),
-        "email": emailController.text.trim(),
+        "fullName": fullName,
+        "email": email,
         "role": "admin",
         "status": "active",
         "createdAt": FieldValue.serverTimestamp(),
       });
 
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Admin registered successfully")));
+
+      // Navigate to Home
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomePage(role: "admin")),
       );
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'email-already-in-use':
+          message = "Email already exists";
+          break;
+        case 'invalid-email':
+          message = "Invalid email format";
+          break;
+        case 'weak-password':
+          message = "Password must be at least 6 characters";
+          break;
+        default:
+          message = e.message ?? "Unknown error";
+      }
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       setState(() => loading = false);
     }

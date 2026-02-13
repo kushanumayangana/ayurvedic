@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ========= HELPERS ========= */
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isLoggedIn()
+        && (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && userDoc().data.role == "admin")
+          || request.auth.token.admin == true
+        );
+    }
+
+    function isDoctor(docId) {
+      return isLoggedIn() && request.auth.uid == docId;
+    }
+
+    /* ========= DOCTORS ========= */
+    match /doctors/{docId} {
+      // PUBLIC: only approved doctors
+      allow read: if resource.data.status == "approved";
+
+      // ADMIN: can read ALL doctors
+      allow read: if isAdmin();
+
+      // Doctor creates own profile
+      allow create: if isDoctor(docId);
+
+      // Doctor updates own data - allow if they own it and NOT changing status
+      allow update: if isDoctor(docId) 
+        && !('status' in request.resource.data.diff(resource.data).affectedKeys());
+
+      // ADMIN can update anything including status
+      allow update: if isAdmin();
+    }
+
+    /* ========= ARTICLES ========= */
+    match /articles/{articleId} {
+      allow read: if true;
+      allow create: if isLoggedIn();
+      allow update, delete: if isLoggedIn() && (request.auth.uid == resource.data.doctorId || isAdmin());
+    }
+
+    /* ========= APPOINTMENTS ========= */
+    match /appointments/{appointmentId} {
+      allow read: if isLoggedIn() && (request.auth.uid == resource.data.patientId || request.auth.uid == resource.data.doctorId);
+      allow create: if isLoggedIn();
+      allow update: if isLoggedIn() && request.auth.uid == resource.data.doctorId;
+    }
+
+    /* ========= USERS ========= */
+    match /users/{userId} {
+      allow read, write: if isLoggedIn() && request.auth.uid == userId;
+    }
+  }
+}

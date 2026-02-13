@@ -51,21 +51,23 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       );
 
       // 4. Save to Firestore
-      // We add 'patientName' and 'status' so it works with the Doctor Dashboard
       await FirebaseFirestore.instance.collection('appointments').add({
         "doctorId": widget.doctorId,
         "doctorName": widget.doctorName,
-        "userId": user.uid,
+        "patientId": user.uid,
         "patientName": user.displayName ?? "Patient ${user.uid.substring(0, 5)}",
         "status": "pending",
-        "dateTime": Timestamp.fromDate(appointmentDateTime),
+        "date": "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}",
+        "time": "${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}",
+        "reason": "Consultation",
         "createdAt": FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
 
-      _showSnackBar("Appointment booked successfully!");
-      Navigator.pop(context); // Go back after success
+      _showSnackBar("✅ Appointment booked! Waiting for doctor approval...");
+      await Future.delayed(const Duration(seconds: 1));
+      if (mounted) Navigator.pop(context);
       
     } catch (e) {
       _showSnackBar("Booking failed: ${e.toString()}");

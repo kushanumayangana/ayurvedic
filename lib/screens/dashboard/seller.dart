@@ -2,7 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'seller_edit_profile.dart';
+import '../../services/cloudinary_service.dart';
 
 class SellerDashboard extends StatefulWidget {
   const SellerDashboard({super.key});
@@ -16,6 +22,12 @@ class _SellerDashboardState extends State<SellerDashboard> {
   String profileImage = "";
   String whatsapp = "";
   String phone = "";
+  String description = "";
+  bool hasProfile = false;
+
+  // profile image pickers
+  File? profileImageFile;
+  XFile? profileImageWeb;
 
   final Color primaryColor = const Color(0xFF24615E);
 
@@ -36,6 +48,8 @@ class _SellerDashboardState extends State<SellerDashboard> {
         profileImage = data['profileImage'] ?? "";
         whatsapp = data['whatsapp'] ?? "";
         phone = data['phone'] ?? "";
+        description = data['description'] ?? "";
+        hasProfile = true;
       });
     }
   }
@@ -60,7 +74,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: Column(
+        child: hasProfile ? Column(
           children: [
             // ---------- PROFILE CARD ----------
             Card(
@@ -82,6 +96,9 @@ class _SellerDashboardState extends State<SellerDashboard> {
                       style: const TextStyle(
                           fontSize: 22, fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 8),
+                    if (description.isNotEmpty)
+                      Text(description, textAlign: TextAlign.center,),
                     const SizedBox(height: 8),
                     if (phone.isNotEmpty)
                       Row(
@@ -139,7 +156,24 @@ class _SellerDashboardState extends State<SellerDashboard> {
                       title: const Text("Edit Profile"),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 18),
                       onTap: () {
-                        // Navigate to profile edit page
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SellerEditProfileScreen(
+                              sellerData: {
+                                'fullName': fullName,
+                                'profileImage': profileImage,
+                                'whatsapp': whatsapp,
+                                'phone': phone,
+                                'description': description,
+                              },
+                            ),
+                          ),
+                        ).then((updated) {
+                          if (updated == true) {
+                            _loadSellerData();
+                          }
+                        });
                       },
                     ),
                   ],
@@ -147,8 +181,79 @@ class _SellerDashboardState extends State<SellerDashboard> {
               ),
             ),
           ],
-        ),
+        ) : _buildSellerCreateProfile(),
       ),
+    );
+  }
+
+  Widget _buildSellerCreateProfile() {
+    final nameCtrl = TextEditingController();
+    final whatsappCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+
+    return Column(
+      children: [
+        const Icon(Icons.person_add_alt, size: 80),
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: () async {
+            final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+            if (picked != null) {
+              if (kIsWeb) {
+                profileImageWeb = picked;
+              } else {
+                profileImageFile = File(picked.path);
+              }
+              setState(() {});
+            }
+          },
+          child: CircleAvatar(
+            radius: 40,
+            backgroundImage: profileImageFile != null
+                ? FileImage(profileImageFile!) as ImageProvider
+                : (profileImageWeb != null ? NetworkImage(profileImageWeb!.path) : null),
+            child: profileImageFile == null && profileImageWeb == null ? const Icon(Icons.camera_alt) : null,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name')),
+        TextField(controller: whatsappCtrl, decoration: const InputDecoration(labelText: 'WhatsApp Number')),
+        TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone')),
+        TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description'), maxLines: 3),
+        const SizedBox(height: 12),
+        ElevatedButton(
+          onPressed: () async {
+            final uid = FirebaseAuth.instance.currentUser!.uid;
+            String imgUrl = "";
+
+            if (CloudinaryService.isConfigured() && (kIsWeb && profileImageWeb != null || !kIsWeb && profileImageFile != null)) {
+              if (kIsWeb && profileImageWeb != null) {
+                imgUrl = await CloudinaryService.uploadImageFromWeb(profileImageWeb!) ?? "";
+              } else if (!kIsWeb && profileImageFile != null) {
+                imgUrl = await CloudinaryService.uploadImageFromFile(profileImageFile!) ?? "";
+              }
+            } else if (!kIsWeb && profileImageFile != null) {
+              final ref = FirebaseStorage.instance.ref().child('profiles').child('$uid.jpg');
+              await ref.putFile(profileImageFile!);
+              imgUrl = await ref.getDownloadURL();
+            }
+
+            await FirebaseFirestore.instance.collection('sellers').doc(uid).set({
+              'fullName': nameCtrl.text.trim(),
+              'whatsapp': whatsappCtrl.text.trim(),
+              'phone': phoneCtrl.text.trim(),
+              'description': descCtrl.text.trim(),
+              'profileImage': imgUrl,
+              'createdAt': Timestamp.now(),
+            });
+
+            await _loadSellerData();
+          },
+          child: const Text('Create Profile'),
+          style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+        )
+      ],
     );
   }
 }

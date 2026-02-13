@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../doctor/article/add_article.dart';
+import 'package:intl/intl.dart';
+import '../doctor/doctor_profile.dart';
+import '../doctor/articles/write_article_page.dart';
 
 class DoctorDashboard extends StatefulWidget {
   const DoctorDashboard({super.key});
@@ -10,345 +12,421 @@ class DoctorDashboard extends StatefulWidget {
   State<DoctorDashboard> createState() => _DoctorDashboardState();
 }
 
-class _DoctorDashboardState extends State<DoctorDashboard> {
-  // Color Palette
+class _DoctorDashboardState extends State<DoctorDashboard>
+    with SingleTickerProviderStateMixin {
+  final String doctorId = FirebaseAuth.instance.currentUser!.uid;
   final Color primaryGreen = const Color(0xFF24615E);
-  final Color secondaryGreen = const Color(0xFF1B4332);
-  final Color bgLight = const Color(0xFFF9FBFB);
-  
-  final String doctorId = FirebaseAuth.instance.currentUser?.uid ?? "";
+  final Color lightGreen = const Color(0xFFE8F3F2);
+  final Color accentGreen = const Color(0xFF2E7D72);
+
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  // ================= UI =================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgLight,
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ---------- HEADER SECTION ----------
-            _buildHeader(),
-
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ---------- ACTION BUTTONS ----------
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildActionButton(
-                          label: "Add Medicine",
-                          icon: Icons.medical_services_outlined,
-                          color: primaryGreen,
-                          textColor: Colors.white,
-                          onTap: () {
-                            // Logic for adding products/medicine
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: _buildActionButton(
-                          label: "Write Article",
-                          icon: Icons.history_edu_rounded,
-                          color: Colors.white,
-                          textColor: primaryGreen,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const AddArticlePage()),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+      backgroundColor: lightGreen,
+      appBar: AppBar(
+        title: const Text(
+          "Doctor Dashboard",
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+        ),
+        backgroundColor: primaryGreen,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.person_outline),
+              onPressed: () async {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DoctorProfilePage(
+                      doctorId: doctorId,
+                    ),
                   ),
-
-                  const SizedBox(height: 35),
-
-                  // ---------- APPOINTMENT REQUESTS ----------
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("Appointment Requests", 
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: secondaryGreen)),
-                      Text("View All", 
-                        style: TextStyle(color: primaryGreen, fontSize: 12, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-
-                  StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('appointments')
-                        .where('doctorId', isEqualTo: doctorId)
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      
-                      final docs = snapshot.data?.docs ?? [];
-                      
-                      if (docs.isEmpty) {
-                        return _buildEmptyState();
-                      }
-
-                      return Column(
-                        children: docs.map((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          return _buildScheduleTile(
-                            id: doc.id,
-                            name: data['patientName'] ?? "Unknown Patient",
-                            status: data['status'] ?? 'pending',
-                          );
-                        }).toList(),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 30),
-                  Text("Recent Orders", 
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: secondaryGreen)),
-                  const SizedBox(height: 15),
-                  _buildOrderPlaceholder(),
-                  const SizedBox(height: 100), // Bottom padding for scrolling
-                ],
+                );
+              },
+            ),
+          )
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Container(
+            decoration: BoxDecoration(
+              color: primaryGreen,
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(20),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // --- UI COMPONENTS ---
-
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(top: 60, left: 25, right: 25, bottom: 40),
-      decoration: const BoxDecoration(
-        color: Color(0xFFE8F1E9),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(40),
-          bottomRight: Radius.circular(40),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("AyurvedaCare", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryGreen)),
-          const SizedBox(height: 10),
-          Text("Doctor Dashboard", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: secondaryGreen)),
-          const Text("Manage your patients and schedule", style: TextStyle(color: Color(0xFF6A9175), fontSize: 14)),
-          const SizedBox(height: 25),
-          
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('appointments')
-                .where('doctorId', isEqualTo: doctorId)
-                .snapshots(),
-            builder: (context, snapshot) {
-              int total = snapshot.hasData ? snapshot.data!.docs.length : 0;
-              int approved = snapshot.hasData ? snapshot.data!.docs.where((d) => d['status'] == 'approved').length : 0;
-              int pending = snapshot.hasData ? snapshot.data!.docs.where((d) => d['status'] == 'pending').length : 0;
-
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildStatCard(total.toString(), "Bookings", Icons.calendar_month_rounded),
-                  _buildStatCard(approved.toString(), "Success", Icons.check_circle_outline),
-                  _buildStatCard(pending.toString(), "Pending", Icons.hourglass_bottom_rounded),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String value, String label, IconData icon) {
-    return Container(
-      width: MediaQuery.of(context).size.width * 0.27,
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        color: Colors.white, 
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: primaryGreen, size: 20),
-          const SizedBox(height: 8),
-          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: secondaryGreen)),
-          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton({required String label, required IconData icon, required Color color, required Color textColor, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 100,
-        decoration: BoxDecoration(
-          color: color, 
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 8))],
-          border: color == Colors.white ? Border.all(color: Colors.black.withOpacity(0.05)) : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: textColor, size: 28),
-            const SizedBox(height: 8),
-            Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 14)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScheduleTile({required String id, required String name, required String status}) {
-    bool isPending = status == 'pending';
-    bool isApproved = status == 'approved';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white, 
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(
-          color: isApproved ? Colors.green.withOpacity(0.2) : 
-                 status == 'rejected' ? Colors.red.withOpacity(0.2) : Colors.transparent
-        ),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]
-      ),
-      child: Row(
-        children: [
-          // Left Time Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: isApproved ? const Color(0xFFE8F1E9) : const Color(0xFFF1F7F2), 
-              borderRadius: BorderRadius.circular(15)
-            ),
-            child: Column(
-              children: [
-                Text("09:30", style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold, fontSize: 13)),
-                Text("AM", style: TextStyle(color: primaryGreen, fontSize: 9, fontWeight: FontWeight.bold)),
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: Colors.white,
+              indicatorWeight: 3,
+              indicatorSize: TabBarIndicatorSize.label,
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.normal,
+                fontSize: 14,
+              ),
+              tabs: const [
+                Tab(text: "Appointments"),
+                Tab(text: "Write Article"),
+                Tab(text: "My Articles"),
               ],
             ),
           ),
-          const SizedBox(width: 15),
-          
-          // Patient Info
+        ),
+      ),
+      body: FutureBuilder<DocumentSnapshot>(
+        future:
+            FirebaseFirestore.instance.collection('doctors').doc(doctorId).get(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          if (!snapshot.hasData || !snapshot.data!.exists) {
+            return _noProfileView();
+          }
+
+          final doctor = snapshot.data!.data() as Map<String, dynamic>;
+
+          return Column(
+            children: [
+              _doctorHeader(doctor),
+              Expanded(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF4F7F7),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(25),
+                    ),
+                  ),
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _appointmentsTab(),
+                      _writeArticleTab(doctor),
+                      _myArticlesTab(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // ================= NO PROFILE =================
+
+  Widget _noProfileView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: lightGreen,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.medical_services_outlined,
+              size: 60,
+              color: primaryGreen.withOpacity(0.5),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            "Complete Your Profile",
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Set up your professional profile\nto start receiving appointments",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryGreen,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              elevation: 2,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DoctorProfilePage(
+                    doctorId: doctorId,
+                  ),
+                ),
+              );
+            },
+            child: const Text(
+              "Create Your Profile",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================= HEADER =================
+
+  Widget _doctorHeader(Map<String, dynamic> doctor) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [primaryGreen, accentGreen],
+        ),
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(30),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: primaryGreen.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: CircleAvatar(
+              radius: 35,
+              backgroundColor: Colors.white,
+              backgroundImage: doctor['profileImage'] != null &&
+                      doctor['profileImage'] != ""
+                  ? NetworkImage(doctor['profileImage'])
+                  : null,
+              child: doctor['profileImage'] == null ||
+                      doctor['profileImage'] == ""
+                  ? Icon(Icons.person, size: 35, color: Colors.grey.shade400)
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: secondaryGreen)),
                 Text(
-                  status == 'pending' ? "Needs Review" : 
-                  status == 'approved' ? "Confirmed Success" : "Rejected/Failed",
-                  style: TextStyle(
-                    color: isApproved ? Colors.green : 
-                           status == 'rejected' ? Colors.red : Colors.orange, 
-                    fontSize: 11, fontWeight: FontWeight.bold
+                  doctor['fullName'] ?? doctor['name'] ?? "Doctor",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    doctor['specialization'] ?? "Specialist",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-
-          // Action Buttons
-          if (isPending)
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () {
-                    FirebaseFirestore.instance.collection('appointments').doc(id).update({'status': 'rejected'});
-                  },
-                  icon: const Icon(Icons.close_rounded, color: Colors.redAccent),
-                ),
-                const SizedBox(width: 4),
-                ElevatedButton(
-                  onPressed: () {
-                    FirebaseFirestore.instance.collection('appointments').doc(id).update({'status': 'approved'});
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryGreen,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                  ),
-                  child: const Text("Accept", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            )
-          else
-            Icon(
-              isApproved ? Icons.check_circle_rounded : Icons.cancel_rounded,
-              color: isApproved ? Colors.green : Colors.red,
-              size: 28,
-            ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(30),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: Colors.black.withOpacity(0.02)),
-      ),
-      child: const Column(
-        children: [
-          Icon(Icons.calendar_today_outlined, color: Colors.grey, size: 40),
-          SizedBox(height: 10),
-          Text("No appointments found", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
-        ],
+  // ================= APPOINTMENTS =================
+
+  Widget _appointmentsTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('appointments')
+          .where('doctorId', isEqualTo: doctorId)
+          .orderBy('date', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Something went wrong', style: TextStyle(color: Colors.grey.shade600)),
+          );
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+
+        if (docs.isEmpty) {
+          return Center(child: Text("No Appointments Yet"));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final doc = docs[index];
+            final data = doc.data() as Map<String, dynamic>;
+            return ListTile(
+              title: Text(data['patientName'] ?? 'Patient'),
+              subtitle: Text("${data['date'] ?? ''} | ${data['time'] ?? ''}"),
+              trailing: Text(
+                (data['status'] ?? 'pending').toUpperCase(),
+                style: TextStyle(
+                  color: (data['status'] == 'approved')
+                      ? Colors.green
+                      : (data['status'] == 'rejected')
+                          ? Colors.red
+                          : Colors.orange,
+                ),
+              ),
+              onTap: () => _showAppointmentDetails(data, doc.id),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ================= WRITE ARTICLE =================
+
+  Widget _writeArticleTab(Map<String, dynamic> doctor) {
+    return Center(
+      child: ElevatedButton.icon(
+        icon: const Icon(Icons.edit_note),
+        label: const Text("Write New Article"),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryGreen,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => WriteArticlePage(
+                doctorId: doctorId,
+                doctorName: doctor['fullName'] ?? doctor['name'] ?? "",
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildOrderPlaceholder() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            height: 50, width: 50,
-            decoration: BoxDecoration(color: const Color(0xFFF1F7F2), borderRadius: BorderRadius.circular(15)),
-            child: Icon(Icons.shopping_bag_outlined, color: primaryGreen),
-          ),
-          const SizedBox(width: 15),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Herbal Package", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                Text("Order #4829 - Processing", style: TextStyle(color: Colors.grey, fontSize: 11)),
-              ],
-            ),
-          ),
-          const Text("\$24.00", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-        ],
-      ),
+  // ================= MY ARTICLES =================
+
+  Widget _myArticlesTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('articles')
+          .where('doctorId', isEqualTo: doctorId)
+          .orderBy("createdAt", descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+
+        if (docs.isEmpty) {
+          return Center(child: Text("No Articles Yet"));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final timestamp = data['createdAt'] as Timestamp?;
+            final date = timestamp != null
+                ? DateFormat('MMM d, yyyy').format(timestamp.toDate())
+                : 'Unknown date';
+
+            return ListTile(
+              title: Text(data['title'] ?? ''),
+              subtitle: Text(data['content'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
+              trailing: Text(date, style: TextStyle(fontSize: 11, color: Colors.grey)),
+              onTap: () => _showArticleDetails(data),
+            );
+          },
+        );
+      },
     );
+  }
+
+  
+
+  void _showAppointmentDetails(Map<String, dynamic> data, String docId) {
+    
+  }
+
+  void _showArticleDetails(Map<String, dynamic> data) {
+  
   }
 }

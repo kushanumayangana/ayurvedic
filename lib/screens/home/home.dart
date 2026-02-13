@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../doctor/appointment/book_appointment.dart'; 
-// import '../doctor/profile/doctor_profile_detail.dart'; // Ensure this exists
-import '../dashboard/admin.dart';
+
+import '../doctor/appointment/book_appointment.dart';
 import '../dashboard/doctor.dart';
 import '../dashboard/patient.dart';
-import '../dashboard/seller.dart';
+import '../dashboard/admin.dart';
+import '../doctor/doctor_profile.dart';
+import '../patien/article_detail.dart';
 
 class HomePage extends StatefulWidget {
   final String role;
@@ -17,365 +18,358 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final Color primaryGreen = const Color(0xFF24615E); 
+  final Color primaryGreen = const Color(0xFF24615E);
+  final Color secondaryGreen = const Color(0xFF1B4332);
   final Color lightBg = const Color(0xFFF9FBFB);
+
   int _selectedIndex = 0;
+  final user = FirebaseAuth.instance.currentUser;
+
+  String doctorSearch = "";
+  String articleSearch = "";
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: lightBg,
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 25),
-                  
-                  // --- DOCTOR CHANNELING ---
-                  _buildSectionHeader("Doctor Channeling"),
-                  const SizedBox(height: 15),
-                  _buildSearchField("Search Medicines, doctors..."),
-                  const SizedBox(height: 15),
-                  _buildDoctorList(),
-
-                  const SizedBox(height: 30),
-
-                  // --- MARKET PLACE ---
-                  _buildSectionHeader("Market Place", subTitle: "Popular Medicines"),
-                  const SizedBox(height: 15),
-                  _buildProductList(),
-
-                  const SizedBox(height: 30),
-
-                  // --- LEARN HUB ---
-                  _buildSectionHeader("Learn Hub"),
-                  const SizedBox(height: 15),
-                  _buildLearnHubSearch(),
-                  const SizedBox(height: 20),
-                  _buildArticleList(),
-                  const SizedBox(height: 100), 
-                ],
+      body: RefreshIndicator(
+        onRefresh: () async => setState(() {}),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 25),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _sectionTitle("Doctor Channeling"),
+                    const SizedBox(height: 15),
+                    _searchBox("Search doctors...", (value) => setState(() => doctorSearch = value)),
+                    const SizedBox(height: 15),
+                    SizedBox(
+                      height: 180,
+                      child: _doctorList(),
+                    ),
+                    const SizedBox(height: 35),
+                    _sectionTitle("Learn Hub"),
+                    const SizedBox(height: 15),
+                    _searchBox("Search articles...", (value) => setState(() => articleSearch = value)),
+                    const SizedBox(height: 15),
+                    _articleList(),
+                    const SizedBox(height: 50),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      bottomNavigationBar: _bottomNav(),
     );
   }
 
-  // --- HEADER COMPONENT ---
   Widget _buildHeader() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(top: 60, left: 25, right: 25, bottom: 40),
+      padding: const EdgeInsets.fromLTRB(25, 60, 25, 40),
       decoration: const BoxDecoration(
-        color: Color(0xFFE8F1E9),
+        gradient: LinearGradient(
+          colors: [Color(0xFFE8F1E9), Color(0xFFD2E7D6)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(40),
           bottomRight: Radius.circular(40),
         ),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("AyurvedaCare", style: TextStyle(color: Color(0xFF4C7B5C), fontWeight: FontWeight.bold, fontSize: 12)),
-          const SizedBox(height: 10),
-          Text("Hello, John", 
-              style: TextStyle(color: primaryGreen, fontSize: 28, fontWeight: FontWeight.bold)),
-          const Text("How are you feeling today?", 
-              style: TextStyle(color: Color(0xFF6A9175), fontSize: 16)),
-        ],
-      ),
-    );
-  }
-
-  // --- DOCTOR LIST COMPONENT ---
-  Widget _buildDoctorList() {
-    return SizedBox(
-      height: 160,
-      child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection("doctors").snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          return ListView(
-            scrollDirection: Axis.horizontal,
-            children: snapshot.data!.docs.map((doc) {
-              Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-              return _buildDoctorCard(doc.id, data['fullName'] ?? "Doctor", data['specialization'] ?? "Specialist", data['profileImage'] ?? "");
-            }).toList(),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildDoctorCard(String id, String name, String specialty, String image) {
-    return Container(
-      width: 280,
-      margin: const EdgeInsets.only(right: 15, bottom: 5),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white, 
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(radius: 35, backgroundImage: image.isNotEmpty ? NetworkImage(image) : null, backgroundColor: Colors.grey.shade200),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1B4332))),
-                Text(specialty, style: const TextStyle(color: Color(0xFF2D6A4F), fontSize: 11, fontWeight: FontWeight.w600)),
+                const Text("AyurvedaCare", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _buildSmallTag("Online"),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BookAppointmentPage(doctorId: id, doctorName: name))),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(10)),
-                        child: const Text("Book Appoi...", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                )
+                Text("Welcome 👋", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: secondaryGreen)),
+                const SizedBox(height: 5),
+                const Text("Book doctors & learn Ayurveda", style: TextStyle(color: Color(0xFF6A9175))),
               ],
             ),
-          )
-        ],
-      ),
-    );
-  }
-
-  // --- MARKET PLACE COMPONENT ---
-  Widget _buildProductList() {
-    return SizedBox(
-      height: 200,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          _buildProductCard("Ashwagandha", "Immunity Booster", "\$12.99"),
-          _buildProductCard("Neem Balm", "Skin Care", "\$10.50"),
-          _buildProductCard("Brahmi Tea", "Mind Health", "\$15.00"),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProductCard(String name, String type, String price) {
-    return Container(
-      width: 150,
-      margin: const EdgeInsets.only(right: 15, bottom: 5),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white, 
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8)],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(color: const Color(0xFFF1F7F2), borderRadius: BorderRadius.circular(15)),
-              width: double.infinity, 
-              child: const Icon(Icons.eco, color: Color(0xFF2D6A4F), size: 40)
-            ),
           ),
-          const SizedBox(height: 10),
-          Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1B4332))),
-          Text(type, style: const TextStyle(color: Colors.grey, fontSize: 10)),
-          const SizedBox(height: 5),
-          Text(price, style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold, fontSize: 14)),
+          IconButton(
+            onPressed: _openDashboard,
+            icon: Icon(Icons.dashboard, color: primaryGreen),
+            tooltip: 'Open Dashboard',
+          ),
         ],
       ),
     );
   }
 
-  // --- LEARN HUB SECTION (UPDATED) ---
-  Widget _buildLearnHubSearch() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.black12),
-      ),
-      child: const TextField(
-        decoration: InputDecoration(
-          hintText: "Search articles...",
-          hintStyle: TextStyle(color: Colors.black26, fontSize: 14),
-          prefixIcon: Icon(Icons.search, color: Colors.black26),
-          suffixIcon: Icon(Icons.arrow_circle_up, color: Colors.black12),
-          border: InputBorder.none,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildArticleList() {
+  Widget _doctorList() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection("articles").snapshots(),
+      stream: FirebaseFirestore.instance.collection("doctors").snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox();
-        return Column(
-          children: snapshot.data!.docs.map((doc) {
-            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-            String docId = data['doctorId'] ?? "";
-            String docName = data['doctorName'] ?? "Specialist";
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 15),
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(color: Colors.black.withOpacity(0.05)),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 5))],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    data['title'] ?? "Title",
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF1B4332)),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    data['content'] ?? "",
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.4),
-                  ),
-                  const SizedBox(height: 15),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          CircleAvatar(radius: 10, backgroundColor: primaryGreen.withOpacity(0.1), child: Icon(Icons.person, size: 12, color: primaryGreen)),
-                          const SizedBox(width: 8),
-                          Text("By Dr. $docName", style: const TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w500)),
-                        ],
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          // TODO: Navigate to doctor detail page if you have one
-                          // Navigator.push(context, MaterialPageRoute(builder: (_) => DoctorProfileDetail(doctorId: docId)));
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(12)),
-                          child: const Row(
-                            children: [
-                              Text("View Profile", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                              SizedBox(width: 4),
-                              Icon(Icons.arrow_forward_ios, size: 9, color: Colors.white),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                ],
-              ),
+        final filteredDocs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return data['fullName'].toString().toLowerCase().contains(doctorSearch.toLowerCase());
+        }).toList();
+
+        if (filteredDocs.isEmpty) return const Center(child: Text("No doctors found"));
+
+        return ListView.builder(
+          scrollDirection: Axis.horizontal,
+          itemCount: filteredDocs.length,
+          itemBuilder: (context, index) {
+            final data = filteredDocs[index].data() as Map<String, dynamic>;
+            return _doctorCard(
+              filteredDocs[index].id,
+              data['fullName'] ?? "Doctor",
+              data['specialization'] ?? "Specialist",
+              data['profileImage'],
             );
-          }).toList(),
+          },
         );
       },
     );
   }
 
-  // --- HELPER COMPONENTS ---
-  Widget _buildSectionHeader(String title, {String? subTitle}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _doctorCard(String id, String name, String spec, String? image) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DoctorProfilePage(doctorId: id))),
+      child: Container(
+        width: 290,
+        margin: const EdgeInsets.only(right: 15),
+        padding: const EdgeInsets.all(15),
+        decoration: _cardDecoration(),
+        child: Row(
           children: [
-            Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: primaryGreen)),
-            const Text("View All", style: TextStyle(color: Color(0xFF7BA688), fontSize: 12, fontWeight: FontWeight.w600)),
+            CircleAvatar(
+              radius: 35,
+              backgroundImage: image != null ? NetworkImage(image) : null,
+              backgroundColor: Colors.grey.shade200,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: _titleStyle()),
+                  Text(spec, style: _subStyle()),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _tag("Available"),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => BookAppointmentPage(doctorId: id, doctorName: name)),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryGreen,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text("Book", style: TextStyle(fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )
           ],
         ),
-        if (subTitle != null) ...[
-          const SizedBox(height: 4),
-          Text(subTitle, style: const TextStyle(color: Colors.black54, fontSize: 14, fontWeight: FontWeight.w600)),
-        ]
-      ],
+      ),
     );
   }
 
-  Widget _buildSearchField(String hint) {
+  Widget _articleList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection("articles").orderBy("createdAt", descending: true).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+        final filtered = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return data['title'].toString().toLowerCase().contains(articleSearch.toLowerCase());
+        }).toList();
+
+        if (filtered.isEmpty) return const Center(child: Text("No articles found"));
+
+        return ListView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: filtered.length,
+          itemBuilder: (context, index) {
+            final docId = filtered[index].id;
+            final data = filtered[index].data() as Map<String, dynamic>;
+            final imageUrl = data['fileUrl'] ?? "";
+
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ArticleDetailPage(
+                      articleId: docId,
+                      data: data,
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 15),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min, // <-- fix overflow
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    imageUrl.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                            child: Image.network(
+                              imageUrl,
+                              height: 150,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 150,
+                                  color: Colors.grey.shade200,
+                                  child: const Icon(Icons.image_not_supported),
+                                );
+                              },
+                            ),
+                          )
+                        : Container(
+                            height: 150,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF1F7F2),
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                            ),
+                            child: const Center(child: Icon(Icons.image, size: 50, color: Colors.grey)),
+                          ),
+                    Padding(
+                      padding: const EdgeInsets.all(15),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min, // <-- fix overflow
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(data['title'] ?? "Article", style: _titleStyle(fontSize: 17)),
+                          const SizedBox(height: 8),
+                          Text(
+                            data['content'] ?? "",
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.black54, fontSize: 13),
+                          ),
+                          const SizedBox(height: 15),
+                          Row(
+                            children: [
+                              const CircleAvatar(
+                                radius: 12,
+                                backgroundColor: Colors.grey,
+                                child: Icon(Icons.person, size: 16, color: Colors.white),
+                              ),
+                              const SizedBox(width: 8),
+                              Text("${data['author'] ?? 'Dr. Unknown'}",
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              const Spacer(),
+                              const Icon(Icons.arrow_forward, size: 16, color: Colors.grey),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ================= HELPERS =================
+  Widget _sectionTitle(String title) =>
+      Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: primaryGreen));
+
+  Widget _searchBox(String hint, Function(String) onChanged) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.black.withOpacity(0.08)),
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.black12)),
       child: TextField(
+        onChanged: onChanged,
         decoration: InputDecoration(
-          prefixIcon: const Icon(Icons.search, color: Colors.black26),
           hintText: hint,
-          hintStyle: const TextStyle(color: Colors.black26, fontSize: 14),
+          prefixIcon: const Icon(Icons.search),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 15),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
         ),
       ),
     );
   }
 
-  Widget _buildSmallTag(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: const Color(0xFFF1F7F2), borderRadius: BorderRadius.circular(10)),
-      child: Text(label, style: const TextStyle(color: Color(0xFF2D6A4F), fontSize: 10, fontWeight: FontWeight.bold)),
-    );
-  }
+  Widget _tag(String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(color: const Color(0xFFF1F7F2), borderRadius: BorderRadius.circular(10)),
+        child: Text(text, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+      );
 
-  Widget _buildBottomNav() {
+  BoxDecoration _cardDecoration() => BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)],
+      );
+
+  TextStyle _titleStyle({double fontSize = 15}) =>
+      TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: secondaryGreen);
+
+  TextStyle _subStyle() => const TextStyle(fontSize: 11, color: Color(0xFF2D6A4F), fontWeight: FontWeight.w600);
+
+  // ================= BOTTOM NAV =================
+  Widget _bottomNav() {
     return BottomNavigationBar(
       currentIndex: _selectedIndex,
       selectedItemColor: primaryGreen,
       unselectedItemColor: Colors.black38,
-      showUnselectedLabels: true,
-      backgroundColor: Colors.white,
-      type: BottomNavigationBarType.fixed,
-      onTap: (index) {
-        setState(() => _selectedIndex = index);
-        if (index == 3) _onDashboardTapped();
+      onTap: (i) {
+        setState(() => _selectedIndex = i);
+        if (i == 3) _openDashboard();
       },
       items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
-        BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: "Shop"),
-        BottomNavigationBarItem(icon: Icon(Icons.calendar_today_rounded), label: "Appointment"),
-        BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: "Profile"),
+        BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+        BottomNavigationBarItem(icon: Icon(Icons.book), label: "Learn"),
+        BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: "Booking"),
+        BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
       ],
     );
   }
 
-  void _onDashboardTapped() {
-    Widget dest;
-    switch (widget.role.toLowerCase()) {
-      case 'doctor': dest = const DoctorDashboard(); break;
-      case 'seller': dest = const SellerDashboard(); break;
-      default: dest = const PatientDashboard();
+  void _openDashboard() {
+    Widget page;
+    switch (widget.role) {
+      case 'doctor':
+        page = const DoctorDashboard();
+        break;
+      case 'admin':
+        page = const AdminDashboard();
+        break;
+      default:
+        page = const PatientDashboard();
     }
-    Navigator.push(context, MaterialPageRoute(builder: (_) => dest));
+
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 }
