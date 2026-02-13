@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "722482686399",
+    "project_id": "ayurvedic-app-95f44",
+    "storage_bucket": "ayurvedic-app-95f44.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:722482686399:android:724095761ac1c43181990a",
+        "android_client_info": {
+          "package_name": "com.example.ayurvedic_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCUAKtGdpjXeDM-JQD2aYandpVbzdunhk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
