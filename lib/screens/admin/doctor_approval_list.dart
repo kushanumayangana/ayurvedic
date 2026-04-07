@@ -18,14 +18,22 @@ class DoctorApprovalList extends StatelessWidget {
             .where('status', isEqualTo: 'pending')
             .snapshots(),
         builder: (context, snapshot) {
+          // Error handling
           if (snapshot.hasError) {
-            return const Center(child: Text("Error loading doctors"));
+            return Center(
+              child: Text("Error loading doctors: ${snapshot.error}"),
+            );
           }
+
+          // Loading state
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
           final docs = snapshot.data!.docs;
+
+          // Debug log
+          print("Fetched ${docs.length} doctor(s) for approval");
 
           if (docs.isEmpty) {
             return const Center(child: Text("No pending doctors"));
@@ -34,7 +42,14 @@ class DoctorApprovalList extends StatelessWidget {
           return ListView.builder(
             itemCount: docs.length,
             itemBuilder: (context, index) {
-              final docData = docs[index].data() as Map<String, dynamic>;
+              // Safe casting for web compatibility
+              final docDataRaw = docs[index].data();
+              final docData =
+                  docDataRaw is Map<String, dynamic> ? docDataRaw : {};
+
+              print(
+                  "Doctor: ${docData['fullName'] ?? 'No Name'}, Status: ${docData['status']}"); // Debug
+
               return Card(
                 margin:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -47,9 +62,8 @@ class DoctorApprovalList extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => DoctorApprovalDetail(
-                          docId: docs[index].id,
-                        ),
+                        builder: (_) =>
+                            DoctorApprovalDetail(docId: docs[index].id),
                       ),
                     );
                   },

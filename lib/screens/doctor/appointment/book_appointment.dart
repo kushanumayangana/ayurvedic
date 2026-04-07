@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 class BookAppointmentPage extends StatefulWidget {
   final String doctorId;
   final String doctorName;
-
   const BookAppointmentPage({
     super.key,
     required this.doctorId,
@@ -17,176 +16,164 @@ class BookAppointmentPage extends StatefulWidget {
 }
 
 class _BookAppointmentPageState extends State<BookAppointmentPage> {
-  DateTime selectedDate = DateTime.now();
-  TimeOfDay selectedTime = TimeOfDay.now();
+  final dateController = TextEditingController();
+  final timeController = TextEditingController();
+  final reasonController = TextEditingController();
   bool loading = false;
 
-  // Custom Colors to match your UI
-  final Color primaryGreen = const Color(0xFF24615E);
+  @override
+  void dispose() {
+    dateController.dispose();
+    timeController.dispose();
+    reasonController.dispose();
+    super.dispose();
+  }
 
-  Future<void> _bookAppointment() async {
-    // 1. Validate Doctor ID
-    if (widget.doctorId.isEmpty) {
-      _showSnackBar("Error: Doctor information missing.");
-      return;
+  // ================= PICK DATE =================
+  Future<void> pickDate() async {
+    DateTime now = DateTime.now();
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now,
+      lastDate: DateTime(now.year + 1),
+    );
+    if (pickedDate != null) {
+      dateController.text =
+          "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
     }
+  }
 
-    // 2. Check User Authentication
+  // ================= PICK TIME =================
+  Future<void> pickTime() async {
+    final TimeOfDay now = TimeOfDay.now();
+    final TimeOfDay? pickedTime = await showTimePicker(
+      context: context,
+      initialTime: now,
+    );
+    if (pickedTime != null) {
+      timeController.text =
+          "${pickedTime.hour.toString().padLeft(2, '0')}:${pickedTime.minute.toString().padLeft(2, '0')}";
+    }
+  }
+
+  // ================= BOOK APPOINTMENT =================
+  Future<void> bookAppointment() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      _showSnackBar("Please login to book an appointment.");
+    if (user == null) return;
+
+    if (dateController.text.isEmpty || timeController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select both date and time")),
+      );
       return;
     }
 
     setState(() => loading = true);
 
     try {
-      // 3. Construct DateTime
-      final appointmentDateTime = DateTime(
-        selectedDate.year,
-        selectedDate.month,
-        selectedDate.day,
-        selectedTime.hour,
-        selectedTime.minute,
-      );
-
-      // 4. Save to Firestore
+      // STRATEGY: We only save the IDs and the appointment details.
+      // The Doctor Dashboard will use 'patientId' to fetch the LATEST 
+      // name, age, and image from the 'patients' collection.
       await FirebaseFirestore.instance.collection('appointments').add({
-        "doctorId": widget.doctorId,
-        "doctorName": widget.doctorName,
-        "patientId": user.uid,
-        "patientName": user.displayName ?? "Patient ${user.uid.substring(0, 5)}",
-        "status": "pending",
-        "date": "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}",
-        "time": "${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}",
-        "reason": "Consultation",
-        "createdAt": FieldValue.serverTimestamp(),
+        'doctorId': widget.doctorId,
+        'doctorName': widget.doctorName,
+        'patientId': user.uid,
+        'date': dateController.text,
+        'time': timeController.text,
+        'reason': reasonController.text,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Appointment booked successfully ✅")),
+      );
 
-      _showSnackBar("✅ Appointment booked! Waiting for doctor approval...");
-      await Future.delayed(const Duration(seconds: 1));
-      if (mounted) Navigator.pop(context);
-      
+      Navigator.pop(context);
     } catch (e) {
-      _showSnackBar("Booking failed: ${e.toString()}");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => loading = false);
     }
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: primaryGreen),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Book - ${widget.doctorName}"),
-        backgroundColor: primaryGreen,
-        foregroundColor: Colors.white,
+        title: const Text("Book Appointment"),
+        backgroundColor: const Color(0xFF24615E),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Select your preferred slot",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            // DATE PICKER
+            TextField(
+              controller: dateController,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: "Date",
+                prefixIcon: Icon(Icons.calendar_today),
+                border: OutlineInputBorder(),
+              ),
+              onTap: pickDate,
             ),
-            const SizedBox(height: 20),
-            
-            // Date Picker Card
-            _buildSelectionCard(
-              title: "Appointment Date",
-              value: "${selectedDate.toLocal()}".split(' ')[0],
-              icon: Icons.calendar_month,
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: selectedDate,
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 30)),
-                );
-                if (date != null) setState(() => selectedDate = date);
-              },
-            ),
-
             const SizedBox(height: 15),
 
-            // Time Picker Card
-            _buildSelectionCard(
-              title: "Appointment Time",
-              value: selectedTime.format(context),
-              icon: Icons.access_time,
-              onTap: () async {
-                final time = await showTimePicker(
-                  context: context,
-                  initialTime: selectedTime,
-                );
-                if (time != null) setState(() => selectedTime = time);
-              },
+            // TIME PICKER
+            TextField(
+              controller: timeController,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: "Time",
+                prefixIcon: Icon(Icons.access_time),
+                border: OutlineInputBorder(),
+              ),
+              onTap: pickTime,
             ),
+            const SizedBox(height: 15),
 
-            const Spacer(),
+            // REASON
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: "Reason for Appointment",
+                alignLabelWithHint: true,
+                prefixIcon: Padding(
+                  padding: EdgeInsets.only(bottom: 40),
+                  child: Icon(Icons.description),
+                ),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 30),
 
-            // Confirm Button
+            // BOOK BUTTON
             SizedBox(
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
-                onPressed: loading ? null : _bookAppointment,
+                onPressed: loading ? null : bookAppointment,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryGreen,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  backgroundColor: const Color(0xFF24615E),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: loading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text(
-                        "Confirm Booking",
-                        style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                        "Confirm Appointment",
+                        style: TextStyle(fontSize: 16, color: Colors.white),
                       ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSelectionCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: primaryGreen),
-            const SizedBox(width: 15),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const Spacer(),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
           ],
         ),
       ),
