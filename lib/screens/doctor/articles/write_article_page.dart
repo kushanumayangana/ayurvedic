@@ -97,24 +97,36 @@ class _WriteArticlePageState extends State<WriteArticlePage> {
     setState(() => _isUploading = true);
 
     try {
+      // 1. Fetch Doctor's Profile Image from 'doctors' collection
+      String doctorImageUrl = "";
+      final doctorDoc = await FirebaseFirestore.instance
+          .collection('doctors')
+          .doc(widget.doctorId)
+          .get();
+      
+      if (doctorDoc.exists) {
+        doctorImageUrl = doctorDoc.data()?['profileImage'] ?? "";
+      }
+
+      // 2. Upload Article Cover to Cloudinary
       String? imageUrl = "";
       if (_selectedImageFile != null || _selectedImageBytes != null) {
         imageUrl = await _uploadToCloudinary();
       }
 
-      // THE FIX: Explicit structure matching your security rules
+      // 3. Save to Firestore with 'doctorImage' field
       await FirebaseFirestore.instance.collection('articles').add({
         "doctorId": widget.doctorId,
         "author": widget.doctorName,
+        "doctorImage": doctorImageUrl, // Fix for homepage image display
         "title": titleCtrl.text.trim(),
         "content": contentCtrl.text.trim(),
         "fileUrl": imageUrl ?? "",
-        "createdAt": FieldValue.serverTimestamp(), // Better for sorting than Timestamp.now()
+        "createdAt": FieldValue.serverTimestamp(),
       });
 
       _showSnackBar("Article published successfully! 🎉", Colors.green);
 
-      // DELAYED POP: Prevents the "disappearing" glitch by allowing local sync to finish
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) Navigator.pop(context);
       });

@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 // Screens
 import '../doctor/appointment/book_appointment.dart';
 import '../doctor/doctor_profile.dart';
-import '../patien/article_detail.dart';
+import '../doctor/articles/article_detail.dart';
 
 // Dashboard imports with prefixes
 import '../dashboard/doctor.dart' as doctor;
@@ -174,8 +174,9 @@ class _HomePageState extends State<HomePage> {
           children: [
             CircleAvatar(
               radius: 35,
-              backgroundImage: image != null ? NetworkImage(image) : null,
+              backgroundImage: (image != null && image.isNotEmpty) ? NetworkImage(image) : null,
               backgroundColor: Colors.grey.shade200,
+              child: (image == null || image.isEmpty) ? const Icon(Icons.person) : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -204,7 +205,7 @@ class _HomePageState extends State<HomePage> {
                           backgroundColor: primaryGreen,
                         ),
                         child: const Text("Book",
-                            style: TextStyle(fontSize: 11)),
+                            style: TextStyle(fontSize: 11, color: Colors.white)),
                       ),
                     ],
                   ),
@@ -248,21 +249,44 @@ class _HomePageState extends State<HomePage> {
           itemBuilder: (context, index) {
             final docId = filtered[index].id;
             final data = filtered[index].data() as Map<String, dynamic>;
+            final String? doctorPic = data['doctorImage'];
 
-            return ListTile(
-              title: Text(data['title'] ?? "Article"),
-              subtitle: Text(data['author'] ?? ""),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ArticleDetailPage(
-                      articleId: docId,
-                      data: data,
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: _cardDecoration(),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                leading: CircleAvatar(
+                  radius: 25,
+                  backgroundColor: Colors.grey.shade200,
+                  backgroundImage: (doctorPic != null && doctorPic.isNotEmpty)
+                      ? NetworkImage(doctorPic)
+                      : null,
+                  child: (doctorPic == null || doctorPic.isEmpty)
+                      ? const Icon(Icons.person, color: Colors.grey)
+                      : null,
+                ),
+                title: Text(
+                  data['title'] ?? "Article",
+                  style: _titleStyle().copyWith(fontSize: 18),
+                ),
+                subtitle: Text(
+                  "By ${data['author'] ?? 'Unknown'}",
+                  style: _subStyle(),
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ArticleDetailPage(
+                        articleId: docId,
+                        data: data,
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             );
           },
         );
@@ -283,23 +307,40 @@ class _HomePageState extends State<HomePage> {
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: const Icon(Icons.search),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 0),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }
 
   Widget _tag(String text) => Container(
-        padding: const EdgeInsets.all(6),
-        color: Colors.green.shade50,
-        child: Text(text),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: Text(text, style: const TextStyle(fontSize: 10, color: Colors.green)),
       );
 
   BoxDecoration _cardDecoration() => BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       );
 
   TextStyle _titleStyle() =>
-      TextStyle(fontWeight: FontWeight.bold, color: secondaryGreen);
+      TextStyle(fontWeight: FontWeight.bold, color: secondaryGreen, fontSize: 16);
 
   TextStyle _subStyle() =>
       const TextStyle(fontSize: 12, color: Colors.grey);
@@ -308,6 +349,9 @@ class _HomePageState extends State<HomePage> {
   Widget _bottomNav() {
     return BottomNavigationBar(
       currentIndex: _selectedIndex,
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: primaryGreen,
+      unselectedItemColor: Colors.grey,
       onTap: (i) {
         setState(() => _selectedIndex = i);
         if (i == 3) _openDashboard();

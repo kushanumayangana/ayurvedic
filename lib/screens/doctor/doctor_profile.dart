@@ -302,6 +302,9 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
               final data =
                   snapshot.data!.data() as Map<String, dynamic>? ?? {};
 
+              // FIX: Always pull the profile image so it displays in View Mode
+              profileImageUrl = data['profileImage'] ?? '';
+
               if (isEditing && fullName.text.isEmpty) {
                 fullName.text = data['fullName'] ?? '';
                 specialization.text = data['specialization'] ?? '';
@@ -317,7 +320,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                 availableTime.text = data['availableTime'] ?? '';
                 languages.text = data['languages'] ?? '';
                 makesMedicine = data['makesMedicine'] ?? false;
-                profileImageUrl = data['profileImage'] ?? '';
+                // profileImageUrl is already updated above
               }
 
               return SingleChildScrollView(
@@ -361,9 +364,9 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                                               ? NetworkImage(profileImageUrl)
                                                   as ImageProvider
                                               : null),
-                                  child: profileImageBytes == null &&
+                                  child: (profileImageBytes == null &&
                                           profileImageFile == null &&
-                                          profileImageUrl.isEmpty
+                                          profileImageUrl.isEmpty)
                                       ? Icon(Icons.person,
                                           size: 55,
                                           color: Colors.grey.shade400)

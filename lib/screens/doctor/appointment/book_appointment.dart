@@ -29,7 +29,6 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     super.dispose();
   }
 
-  // ================= PICK DATE =================
   Future<void> pickDate() async {
     DateTime now = DateTime.now();
     final DateTime? pickedDate = await showDatePicker(
@@ -44,7 +43,6 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     }
   }
 
-  // ================= PICK TIME =================
   Future<void> pickTime() async {
     final TimeOfDay now = TimeOfDay.now();
     final TimeOfDay? pickedTime = await showTimePicker(
@@ -57,7 +55,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     }
   }
 
-  // ================= BOOK APPOINTMENT =================
+  // ================= UPDATED BOOKING LOGIC =================
   Future<void> bookAppointment() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -72,30 +70,60 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     setState(() => loading = true);
 
     try {
-      // STRATEGY: We only save the IDs and the appointment details.
-      // The Doctor Dashboard will use 'patientId' to fetch the LATEST 
-      // name, age, and image from the 'patients' collection.
+      // 1. FETCH PATIENT DATA
+      // Make sure 'patients' is the correct name of your user collection
+      final patientDoc = await FirebaseFirestore.instance
+          .collection('patients') 
+          .doc(user.uid)
+          .get();
+
+      String pName = "New Patient";
+      String pAge = "-";
+      String pImage = "";
+
+      if (patientDoc.exists) {
+        final data = patientDoc.data();
+        pName = data?['name'] ?? "New Patient";
+        pAge = data?['age'] ?? "-";
+        
+        // Check for common image field names to avoid empty strings
+        pImage = data?['imageUrl'] ?? data?['image'] ?? data?['profilePic'] ?? "";
+      }
+
+      // 2. SAVE APPOINTMENT WITH FULL DETAILS
       await FirebaseFirestore.instance.collection('appointments').add({
         'doctorId': widget.doctorId,
         'doctorName': widget.doctorName,
         'patientId': user.uid,
+        'patientName': pName,
+        'patientAge': pAge,
+        'patientImage': pImage, // This will now contain the fetched URL
         'date': dateController.text,
         'time': timeController.text,
-        'reason': reasonController.text,
+        'reason': reasonController.text.trim(),
         'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(), 
       });
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Appointment booked successfully ✅")),
+        const SnackBar(
+          content: Text("Appointment booked successfully ✅"),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
 
-      Navigator.pop(context);
+      // 3. DELAYED NAVIGATION
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) Navigator.pop(context);
+      });
+
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+      );
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -112,7 +140,6 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // DATE PICKER
             TextField(
               controller: dateController,
               readOnly: true,
@@ -124,8 +151,6 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
               onTap: pickDate,
             ),
             const SizedBox(height: 15),
-
-            // TIME PICKER
             TextField(
               controller: timeController,
               readOnly: true,
@@ -137,8 +162,6 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
               onTap: pickTime,
             ),
             const SizedBox(height: 15),
-
-            // REASON
             TextField(
               controller: reasonController,
               maxLines: 3,
@@ -153,8 +176,6 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
               ),
             ),
             const SizedBox(height: 30),
-
-            // BOOK BUTTON
             SizedBox(
               width: double.infinity,
               height: 55,
