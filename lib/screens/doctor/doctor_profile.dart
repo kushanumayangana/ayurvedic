@@ -166,7 +166,24 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
     }
   }
 
-  Widget buildInfoRow(String label, String value, IconData icon) {
+  Widget buildIconWidget(dynamic icon,
+      {double size = 20, Color? color, double? opacity}) {
+    if (icon is FaIconData) {
+      return FaIcon(
+        icon,
+        size: size,
+        color: color ?? DoctorProfilePage.primaryGreen,
+      );
+    }
+
+    return Icon(
+      icon as IconData,
+      size: size,
+      color: color ?? DoctorProfilePage.primaryGreen,
+    );
+  }
+
+  Widget buildInfoRow(String label, String value, dynamic icon) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -178,7 +195,8 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
               color: DoctorProfilePage.lightGreen,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 20, color: DoctorProfilePage.primaryGreen),
+            child: buildIconWidget(icon,
+                size: 20, color: DoctorProfilePage.primaryGreen),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -204,7 +222,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   }
 
   Widget buildEditableField(String label, TextEditingController controller,
-      IconData icon,
+      dynamic icon,
       {TextInputType? type, int maxLines = 1}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -220,7 +238,8 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
           decoration: InputDecoration(
             labelText: label,
             labelStyle: const TextStyle(color: Colors.grey),
-            prefixIcon: Icon(icon, color: DoctorProfilePage.primaryGreen),
+            prefixIcon: buildIconWidget(icon,
+                color: DoctorProfilePage.primaryGreen),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,

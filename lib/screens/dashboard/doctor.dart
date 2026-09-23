@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart'; // Added for modern dialogs
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../doctor/articles/write_article_page.dart';
@@ -16,6 +17,7 @@ class DoctorDashboardPage extends StatefulWidget {
 class _DoctorDashboardPageState extends State<DoctorDashboardPage> with SingleTickerProviderStateMixin {
   final Color primaryGreen = const Color(0xFF24615E);
   final Color accentCloud = const Color(0xFFF1F5F9);
+  final Color priceColor = const Color(0xFFE57373); 
   
   late TabController _tabController;
   String _doctorName = "Doctor";
@@ -70,18 +72,45 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> with SingleTi
     }
   }
 
+  // --- MODERN DELETE FUNCTION WITH CONFIRMATION ---
   Future<void> _deleteDocument(String collection, String docId) async {
-    try {
-      await FirebaseFirestore.instance.collection(collection).doc(docId).delete();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Deleted successfully ✅"), behavior: SnackBarBehavior.floating),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Delete failed: $e")),
-      );
+    // Show modern confirmation dialog
+    bool confirm = await showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text("Confirm Delete"),
+        content: const Text("Are you sure you want to delete this item? This action cannot be undone."),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text("Cancel"),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text("Delete"),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (confirm) {
+      try {
+        await FirebaseFirestore.instance.collection(collection).doc(docId).delete();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Deleted successfully ✅"), 
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.black87,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Delete failed: $e")),
+        );
+      }
     }
   }
 
@@ -326,7 +355,10 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> with SingleTi
                       : Container(color: Colors.grey[200], width: 50, height: 50, child: const Icon(Icons.image)),
                 ),
                 title: Text(data['title'] ?? "Untitled", style: const TextStyle(fontWeight: FontWeight.bold)),
-                trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => _deleteDocument('articles', docs[index].id)),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent), 
+                  onPressed: () => _deleteDocument('articles', docs[index].id)
+                ),
               ),
             );
           },
@@ -359,7 +391,6 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> with SingleTi
   }
 
   Widget _buildProductCard(Map<String, dynamic> data, String docId) {
-    // UPDATED: Logic to specifically handle the multi-image array
     List<String> images = [];
     if (data['imageUrls'] != null && data['imageUrls'] is List) {
       images = List<String>.from(data['imageUrls'].map((item) => item.toString()));
@@ -367,89 +398,191 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> with SingleTi
       images = [data['imageUrl'].toString()];
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 10))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 240,
-            child: Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  child: images.isNotEmpty
-                      ? PageView.builder(
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: images.length,
-                          itemBuilder: (context, i) => Image.network(
-                            images[i],
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            loadingBuilder: (context, child, progress) => progress == null ? child : Center(child: CircularProgressIndicator(color: primaryGreen.withOpacity(0.2))),
-                            errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[200], child: const Icon(Icons.broken_image, color: Colors.grey)),
-                          ),
-                        )
-                      : Container(color: Colors.grey[100], child: const Center(child: Icon(Icons.image_not_supported))),
-                ),
-                
-                if (images.length > 1)
-                  Positioned(
-                    bottom: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                      child: Text("${images.length} Photos", style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
+    final PageController cardImageController = PageController();
+    int currentImageIndex = 0;
 
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: GestureDetector(
-                    onTap: () => _deleteDocument('products', docId),
-                    child: CircleAvatar(backgroundColor: Colors.white.withOpacity(0.9), radius: 18, child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20)),
-                  ),
-                ),
-
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(8)),
-                    child: Text(data['category']?.toUpperCase() ?? "NEW", style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
+    return StatefulBuilder(
+      builder: (context, setCardState) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              )
+            ],
           ),
-
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 250,
+                child: Stack(
                   children: [
-                    Expanded(child: Text(data['title'] ?? "Product", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18), overflow: TextOverflow.ellipsis)),
-                    Text("LKR ${data['price']}", style: TextStyle(color: primaryGreen, fontWeight: FontWeight.w900, fontSize: 18)),
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                      child: images.isNotEmpty
+                          ? PageView.builder(
+                              controller: cardImageController,
+                              onPageChanged: (index) {
+                                setCardState(() {
+                                  currentImageIndex = index;
+                                });
+                              },
+                              itemCount: images.length,
+                              itemBuilder: (context, i) => Image.network(
+                                images[i],
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : Container(color: Colors.grey[100], child: const Center(child: Icon(Icons.image_not_supported))),
+                    ),
+                    
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: GestureDetector(
+                        onTap: () => _deleteDocument('products', docId),
+                        child: CircleAvatar(
+                          backgroundColor: Colors.white.withOpacity(0.9),
+                          radius: 18,
+                          child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                        ),
+                      ),
+                    ),
+
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: primaryGreen, borderRadius: BorderRadius.circular(8)),
+                        child: Text(
+                          data['category']?.toUpperCase() ?? "NEW",
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+
+                    if (images.length > 1)
+                      Positioned(
+                        bottom: 12,
+                        left: 0,
+                        right: 0,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(images.length, (index) {
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              height: 6,
+                              width: currentImageIndex == index ? 18 : 6,
+                              decoration: BoxDecoration(
+                                color: currentImageIndex == index ? Colors.white : Colors.white54,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(data['description'] ?? "", style: TextStyle(color: Colors.grey[600], fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 10),
-                Text("Stock: ${data['stock'] ?? 0}", style: TextStyle(color: primaryGreen, fontSize: 12, fontWeight: FontWeight.w600)),
-              ],
+              ),
+
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data['title'] ?? "Product Name",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, letterSpacing: -0.5),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "LKR ${data['price']}",
+                      style: TextStyle(
+                        color: priceColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 24,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: accentCloud,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Product details",
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            data['description'] ?? "No description available.",
+                            style: TextStyle(color: Colors.grey[600], fontSize: 13, height: 1.4),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildBeautyStockCounter(data['stock'] ?? 0),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: primaryGreen,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            "Inventory",
+                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBeautyStockCounter(dynamic stock) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD4E157).withOpacity(0.3),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.remove, size: 16, color: Colors.black54),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              "$stock",
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ),
+          const Icon(Icons.add, size: 16, color: Colors.black54),
         ],
       ),
     );
