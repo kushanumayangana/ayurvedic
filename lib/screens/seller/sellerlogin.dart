@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'seller1.dart';
 import '../home/home.dart';
+import 'seller1.dart';
 
 class SellerLoginScreen extends StatefulWidget {
   const SellerLoginScreen({super.key});
@@ -63,11 +63,12 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
         throw Exception('Account has been rejected');
       }
 
-      // Navigate to HomePage
+      // Match the doctor flow: after login, go to the home page first,
+      // then access the seller dashboard from the Dashboard button.
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => HomePage(role: data['sellerType'] ?? 'seller'),
+          builder: (_) => const HomePage(role: 'seller'),
         ),
       );
     } on FirebaseAuthException catch (e) {

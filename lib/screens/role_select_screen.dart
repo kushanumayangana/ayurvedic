@@ -1,10 +1,8 @@
-
 import 'package:flutter/material.dart';
 import 'patien/register_patient.dart';
 import 'seller/seller1.dart';
 import 'doctor/docter1.dart';
-import 'admin/register_admin.dart';
-import 'home/home.dart';
+import 'admin/admin_login.dart';
 
 class RoleSelectScreen extends StatelessWidget {
   const RoleSelectScreen({Key? key}) : super(key: key);
@@ -129,8 +127,8 @@ class RoleSelectScreen extends StatelessWidget {
         page: const SellerRegisterStep1(),
       ),
       RoleData(
-        title: 'Admin',
-        subtitle: 'Manage system, users & analytics',
+        title: 'Admin Login',
+        subtitle: 'Secure access for administrators',
         icon: Icons.admin_panel_settings_outlined,
         iconBgColor: const Color(0xFFE0E7FF),
         iconColor: const Color(0xFF4F46E5),
@@ -139,7 +137,7 @@ class RoleSelectScreen extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [Color(0xFFE0E7FF), Color(0xFFEEF2FF)],
         ),
-        page: const RegisterAdmin(),
+        page: const AdminLoginScreen(),
       ),
     ];
 
@@ -184,9 +182,7 @@ class RoleSelectScreen extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.5),
-              ),
+              border: Border.all(color: Colors.white.withOpacity(0.5)),
             ),
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -200,11 +196,7 @@ class RoleSelectScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Center(
-                      child: Icon(
-                        role.icon,
-                        color: role.iconColor,
-                        size: 28,
-                      ),
+                      child: Icon(role.icon, color: role.iconColor, size: 28),
                     ),
                   ),
                   const SizedBox(width: 20),

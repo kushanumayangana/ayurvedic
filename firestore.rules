@@ -2,64 +2,359 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /* ========= HELPERS ========= */
     function isLoggedIn() {
       return request.auth != null;
     }
 
-    function userDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    function isOwner(userId) {
+      return isLoggedIn() && request.auth.uid == userId;
     }
 
     function isAdmin() {
-      return isLoggedIn()
-        && (
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid))
-            && userDoc().data.role == "admin")
-          || request.auth.token.admin == true
-        );
+      return isLoggedIn() && (
+        request.auth.token.admin == true ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
     }
 
     function isDoctor(docId) {
       return isLoggedIn() && request.auth.uid == docId;
     }
 
-    /* ========= DOCTORS ========= */
+    function isValidOrderCountIncrement(productId) {
+      let orderId = request.resource.data.get('lastOrderId', 'invalid-order-id');
+      let orderPath = /databases/$(database)/documents/orders/$(orderId);
+      return isLoggedIn()
+        && orderId != 'invalid-order-id'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['orderCount', 'lastOrderId'])
+        && request.resource.data.get('orderCount', 0) == resource.data.get('orderCount', 0) + 1
+        && orderId is string
+        && !exists(orderPath)
+        && getAfter(orderPath).data.buyerId == request.auth.uid
+        && getAfter(orderPath).data.productId == productId
+        && (
+          getAfter(orderPath).data.ownerId == resource.data.get('sellerId', '') ||
+          getAfter(orderPath).data.ownerId == resource.data.get('doctorId', '')
+        );
+    }
+
     match /doctors/{docId} {
-      // PUBLIC: only approved doctors
-      allow read: if resource.data.status == "approved";
-
-      // ADMIN: can read ALL doctors
-      allow read: if isAdmin();
-
-      // Doctor creates own profile
+      allow read: if isDoctor(docId) || resource.data.status == "approved" || isAdmin();
       allow create: if isDoctor(docId);
-
-      // Doctor updates own data - allow if they own it and NOT changing status
-      allow update: if isDoctor(docId) 
+      allow update: if isDoctor(docId)
         && !('status' in request.resource.data.diff(resource.data).affectedKeys());
-
-      // ADMIN can update anything including status
       allow update: if isAdmin();
     }
 
-    /* ========= ARTICLES ========= */
     match /articles/{articleId} {
       allow read: if true;
       allow create: if isLoggedIn();
       allow update, delete: if isLoggedIn() && (request.auth.uid == resource.data.doctorId || isAdmin());
     }
 
-    /* ========= APPOINTMENTS ========= */
     match /appointments/{appointmentId} {
-      allow read: if isLoggedIn() && (request.auth.uid == resource.data.patientId || request.auth.uid == resource.data.doctorId);
-      allow create: if isLoggedIn();
-      allow update: if isLoggedIn() && request.auth.uid == resource.data.doctorId;
+      allow read: if isLoggedIn() && (
+        request.auth.uid == resource.data.get('patientId', '') ||
+        request.auth.uid == resource.data.get('doctorId', '') ||
+        request.auth.uid == resource.data.get('sellerId', '') ||
+        isAdmin()
+      );
+      allow create: if isLoggedIn()
+        && request.resource.data.get('patientId', '') == request.auth.uid
+        && (request.resource.data.get('doctorId', '') != '' || request.resource.data.get('sellerId', '') != '');
+      allow update: if isAdmin() || (
+        isLoggedIn()
+        && (request.auth.uid == resource.data.get('doctorId', '') || request.auth.uid == resource.data.get('sellerId', ''))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['pending', 'approved', 'rejected']
+      );
     }
 
-    /* ========= USERS ========= */
+    match /orders/{orderId} {
+      allow create: if isLoggedIn()
+        && request.resource.data.buyerId == request.auth.uid
+        && request.resource.data.ownerId != request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity > 0
+        && request.resource.data.deliveryAddress is string
+        && request.resource.data.deliveryAddress.size() > 0
+        && request.resource.data.productId is string
+        && exists(/databases/$(database)/documents/products/$(request.resource.data.productId))
+        && get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.stock >= request.resource.data.quantity
+        && getAfter(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.get('orderCount', 0)
+          == get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.get('orderCount', 0) + 1
+        && getAfter(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.get('lastOrderId', '') == orderId
+        && (
+          get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.sellerId == request.resource.data.ownerId ||
+          get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.doctorId == request.resource.data.ownerId
+        );
+
+      allow read: if isLoggedIn() && (
+        request.auth.uid == resource.data.buyerId ||
+        request.auth.uid == resource.data.ownerId ||
+        isAdmin()
+      );
+
+      allow update: if isAdmin() || (
+        isLoggedIn()
+        && request.auth.uid == resource.data.ownerId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && (
+          (resource.data.status == 'pending' && request.resource.data.status in ['processing', 'cancelled']) ||
+          (resource.data.status == 'processing' && request.resource.data.status == 'shipped') ||
+          (resource.data.status == 'shipped' && request.resource.data.status == 'delivered')
+        )
+      );
+    }
+
+    match /sellers/{sellerId} {
+      allow read: if true;
+      allow create: if isLoggedIn();
+      allow update, delete: if isAdmin()
+        || isOwner(sellerId)
+        || (isLoggedIn() && resource.data.ownerId == request.auth.uid);
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isLoggedIn() && (
+        (request.resource.data.ownerType == 'doctor' && request.resource.data.doctorId == request.auth.uid) ||
+        (request.resource.data.ownerType == 'seller' && request.resource.data.sellerId == request.auth.uid)
+      );
+      allow update: if isAdmin() ||
+        (isLoggedIn() && (
+          resource.data.doctorId == request.auth.uid ||
+          resource.data.sellerId == request.auth.uid
+        ) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['orderCount', 'lastOrderId'])) ||
+        isValidOrderCountIncrement(productId);
+      allow delete: if isAdmin() ||
+        (isLoggedIn() && (
+          resource.data.doctorId == request.auth.uid ||
+          resource.data.sellerId == request.auth.uid
+        ));
+
+      match /reviews/{reviewerId} {
+        function validReview(data) {
+          return data.keys().hasAll(['reviewerId', 'rating', 'comment', 'createdAt', 'updatedAt'])
+            && data.keys().hasOnly(['reviewerId', 'rating', 'comment', 'createdAt', 'updatedAt'])
+            && data.reviewerId == request.auth.uid
+            && data.rating is int
+            && data.rating >= 1
+            && data.rating <= 5
+            && data.comment is string
+            && data.comment.size() <= 1000;
+        }
+
+        allow read: if true;
+        allow create: if isLoggedIn()
+          && request.auth.uid == reviewerId
+          && !exists(/databases/$(database)/documents/products/$(productId)/reviews/$(reviewerId))
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && validReview(request.resource.data);
+        allow update: if isLoggedIn()
+          && request.auth.uid == reviewerId
+          && resource.data.reviewerId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'comment', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && validReview(request.resource.data);
+        allow delete: if isLoggedIn() && request.auth.uid == reviewerId;
+      }
+    }
+
+    match /articles/{articleId} {
+      allow read: if true;
+      allow create: if isLoggedIn() && (
+        request.resource.data.doctorId == request.auth.uid ||
+        request.resource.data.sellerId == request.auth.uid ||
+        request.resource.data.ownerType == 'seller'
+      );
+      allow update, delete: if isAdmin() ||
+        (isLoggedIn() && (
+          resource.data.doctorId == request.auth.uid ||
+          resource.data.sellerId == request.auth.uid
+        ));
+    }
+
     match /users/{userId} {
-      allow read, write: if isLoggedIn() && request.auth.uid == userId;
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId)
+        && request.resource.data.get('role', '') != 'admin';
+      allow update: if isAdmin() || (
+        isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /app_feedback/{feedbackId} {
+      function validFeedback(data) {
+        return data.keys().hasAll([
+            'userId',
+            'userName',
+            'role',
+            'rating',
+            'comment',
+            'createdAt',
+            'updatedAt'
+          ])
+          && data.keys().hasOnly([
+            'userId',
+            'userName',
+            'role',
+            'rating',
+            'comment',
+            'createdAt',
+            'updatedAt'
+          ])
+          && data.userId == request.auth.uid
+          && data.userName is string
+          && data.userName is string
+          && data.role in ['patient', 'doctor', 'seller', 'admin']
+          && data.rating is int
+          && data.rating >= 1
+          && data.rating <= 5
+          && data.comment is string
+          && data.comment.size() > 0
+          && data.comment.size() <= 2000;
+      }
+
+      allow create: if isLoggedIn()
+        && feedbackId == request.auth.uid
+        && validFeedback(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow read: if isAdmin()
+        || (isLoggedIn() && request.auth.uid == resource.data.userId);
+      allow update: if isLoggedIn()
+        && feedbackId == request.auth.uid
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['userName', 'role', 'rating', 'comment', 'updatedAt'])
+        && validFeedback(request.resource.data)
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isAdmin();
+    }
+
+    match /patients/{patientId} {
+      allow read: if isOwner(patientId) || isAdmin() || (
+        isLoggedIn()
+        && exists(/databases/$(database)/documents/customerProfileAccess/$(patientId)/vendors/$(request.auth.uid))
+        && get(/databases/$(database)/documents/customerProfileAccess/$(patientId)/vendors/$(request.auth.uid)).data.orderId is string
+      );
+      allow create: if isLoggedIn();
+      allow update: if isOwner(patientId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /customerProfileAccess/{patientId}/vendors/{vendorId} {
+      allow read: if isLoggedIn()
+        && (request.auth.uid == patientId || request.auth.uid == vendorId || isAdmin());
+      allow create: if isLoggedIn()
+        && request.auth.uid == vendorId
+        && request.resource.data.keys().hasOnly(['orderId', 'createdAt'])
+        && request.resource.data.orderId is string
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId))
+        && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.buyerId == patientId
+        && get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.ownerId == vendorId;
+      allow update, delete: if false;
+    }
+
+    match /conversations/{conversationId} {
+      function isParticipant() {
+        return isLoggedIn()
+          && request.auth.uid in resource.data.participantIds;
+      }
+
+      function isValidConversation() {
+        return request.resource.data.participantIds is list
+          && request.resource.data.participantIds.size() == 2
+          && request.auth.uid in request.resource.data.participantIds
+          && request.resource.data.sourceOrderId is string
+          && exists(/databases/$(database)/documents/orders/$(request.resource.data.sourceOrderId))
+          && get(/databases/$(database)/documents/orders/$(request.resource.data.sourceOrderId)).data.buyerId
+            in request.resource.data.participantIds
+          && get(/databases/$(database)/documents/orders/$(request.resource.data.sourceOrderId)).data.ownerId
+            in request.resource.data.participantIds;
+      }
+
+      allow create: if isLoggedIn()
+        && isValidConversation()
+        && request.resource.data.keys().hasOnly([
+          'participantIds',
+          'participantProfiles',
+          'sourceOrderId',
+          'lastMessage',
+          'lastMessageId',
+          'lastMessageAt',
+          'lastSenderId',
+          'unreadCounts',
+          'createdAt',
+          'updatedAt'
+        ]);
+      allow read: if isParticipant();
+      allow update: if isParticipant()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'lastMessage',
+          'lastMessageId',
+          'lastMessageAt',
+          'lastSenderId',
+          'unreadCounts',
+          'updatedAt'
+        ])
+        && request.resource.data.lastSenderId in resource.data.participantIds;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function isConversationParticipant() {
+          return isLoggedIn()
+            && request.auth.uid in get(
+              /databases/$(database)/documents/conversations/$(conversationId)
+            ).data.participantIds;
+        }
+
+        allow read: if isConversationParticipant();
+        allow create: if isConversationParticipant()
+          && request.resource.data.keys().hasAll([
+            'senderId',
+            'text',
+            'imageUrl',
+            'type',
+            'readBy',
+            'createdAt'
+          ])
+          && request.resource.data.keys().hasOnly([
+            'senderId',
+            'text',
+            'imageUrl',
+            'type',
+            'readBy',
+            'createdAt'
+          ])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 4000
+          && request.resource.data.imageUrl is string
+          && request.resource.data.type in ['text', 'image']
+          && request.resource.data.readBy == [request.auth.uid]
+          && request.resource.data.createdAt == request.time
+          && (
+            request.resource.data.type == 'text'
+              ? request.resource.data.text.size() > 0
+                && request.resource.data.imageUrl == ''
+              : request.resource.data.imageUrl.size() > 0
+          );
+        allow update: if isConversationParticipant()
+          && resource.data.senderId != request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+          && request.resource.data.readBy.hasAll(resource.data.readBy)
+          && request.resource.data.readBy.hasAll([request.auth.uid])
+          && request.resource.data.readBy.size() == resource.data.readBy.size() + 1;
+        allow delete: if isConversationParticipant()
+          && resource.data.senderId == request.auth.uid;
+      }
     }
   }
 }

@@ -11,11 +11,19 @@ import 'package:http/http.dart' as http;
 class WriteArticlePage extends StatefulWidget {
   final String doctorId;
   final String doctorName;
+  final String ownerType;
+  final String ownerId;
+  final String? articleId;
+  final Map<String, dynamic>? initialData;
 
   const WriteArticlePage({
     super.key,
     required this.doctorId,
     required this.doctorName,
+    this.ownerType = 'doctor',
+    this.ownerId = '',
+    this.articleId,
+    this.initialData,
   });
 
   @override
@@ -26,19 +34,34 @@ class _WriteArticlePageState extends State<WriteArticlePage> {
   final TextEditingController titleCtrl = TextEditingController();
   final TextEditingController contentCtrl = TextEditingController();
 
-  final Color primaryGreen = const Color(0xFF24615E);
-  final Color accentTeal = const Color(0xFF3B8F8B);
-  final Color surfaceWhite = const Color(0xFFF8FAFB);
+  Color get primaryGreen => widget.ownerType == 'seller'
+      ? const Color(0xFFC59D3F)
+      : const Color(0xFF24615E);
+  Color get accentTeal => widget.ownerType == 'seller'
+      ? const Color(0xFFD9A64E)
+      : const Color(0xFF3B8F8B);
+  Color get surfaceWhite => widget.ownerType == 'seller'
+      ? const Color(0xFFFFF8E7)
+      : const Color(0xFFF8FAFB);
 
   File? _selectedImageFile;
   Uint8List? _selectedImageBytes;
   bool _isUploading = false;
+  String _existingImageUrl = '';
 
   @override
   void dispose() {
     titleCtrl.dispose();
     contentCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    titleCtrl.text = widget.initialData?['title']?.toString() ?? '';
+    contentCtrl.text = widget.initialData?['content']?.toString() ?? '';
+    _existingImageUrl = widget.initialData?['fileUrl']?.toString() ?? '';
   }
 
   Future<void> _pickImage() async {
@@ -97,39 +120,65 @@ class _WriteArticlePageState extends State<WriteArticlePage> {
     setState(() => _isUploading = true);
 
     try {
-      // 1. Fetch Doctor's Profile Image from 'doctors' collection
-      String doctorImageUrl = "";
-      final doctorDoc = await FirebaseFirestore.instance
-          .collection('doctors')
-          .doc(widget.doctorId)
-          .get();
-      
-      if (doctorDoc.exists) {
-        doctorImageUrl = doctorDoc.data()?['profileImage'] ?? "";
+      // 1. Fetch profile image from the current owner collection
+      String profileImageUrl = "";
+      if (widget.ownerType == 'seller') {
+        final sellerDoc = await FirebaseFirestore.instance
+            .collection('sellers')
+            .doc(widget.ownerId.isNotEmpty ? widget.ownerId : widget.doctorId)
+            .get();
+
+        if (sellerDoc.exists) {
+          profileImageUrl = sellerDoc.data()?['profileImage'] ?? "";
+        }
+      } else {
+        final doctorDoc = await FirebaseFirestore.instance
+            .collection('doctors')
+            .doc(widget.doctorId)
+            .get();
+
+        if (doctorDoc.exists) {
+          profileImageUrl = doctorDoc.data()?['profileImage'] ?? "";
+        }
       }
 
-      // 2. Upload Article Cover to Cloudinary
-      String? imageUrl = "";
+      String? imageUrl = _existingImageUrl;
       if (_selectedImageFile != null || _selectedImageBytes != null) {
         imageUrl = await _uploadToCloudinary();
+        if (imageUrl == null) throw Exception('Article cover upload failed');
       }
 
-      // 3. Save to Firestore with 'doctorImage' field
-      await FirebaseFirestore.instance.collection('articles').add({
-        "doctorId": widget.doctorId,
+      final articleData = <String, dynamic>{
         "author": widget.doctorName,
-        "doctorImage": doctorImageUrl, // Fix for homepage image display
+        "doctorImage": profileImageUrl,
+        "ownerType": widget.ownerType,
         "title": titleCtrl.text.trim(),
         "content": contentCtrl.text.trim(),
-        "fileUrl": imageUrl ?? "",
-        "createdAt": FieldValue.serverTimestamp(),
-      });
+        "fileUrl": imageUrl ?? '',
+      };
 
-      _showSnackBar("Article published successfully! 🎉", Colors.green);
+      final articles = FirebaseFirestore.instance.collection('articles');
+      if (widget.articleId == null) {
+        await articles.add({
+          ...articleData,
+          "doctorId": widget.doctorId,
+          "sellerId": widget.ownerType == 'seller'
+              ? (widget.ownerId.isNotEmpty ? widget.ownerId : widget.doctorId)
+              : '',
+          "createdAt": FieldValue.serverTimestamp(),
+        });
+      } else {
+        await articles.doc(widget.articleId).update({
+          ...articleData,
+          "updatedAt": FieldValue.serverTimestamp(),
+        });
+      }
 
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) Navigator.pop(context);
-      });
+      _showSnackBar(
+        widget.articleId == null ? "Article published successfully! 🎉" : "Article updated successfully",
+        Colors.green,
+      );
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       _showSnackBar("Publishing failed: $e", Colors.redAccent);
       setState(() => _isUploading = false);
@@ -147,7 +196,10 @@ class _WriteArticlePageState extends State<WriteArticlePage> {
     return Scaffold(
       backgroundColor: surfaceWhite,
       appBar: AppBar(
-        title: const Text("Create Masterpiece", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text(
+          widget.articleId == null ? "Create Masterpiece" : "Edit Article",
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         backgroundColor: primaryGreen,
         elevation: 0,
         centerTitle: true,
@@ -180,7 +232,7 @@ class _WriteArticlePageState extends State<WriteArticlePage> {
 
   Widget _buildTextField(TextEditingController ctrl, String hint, IconData icon, int lines) {
     return Container(
-      decoration: BoxDecoration(
+          decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 8))],
@@ -208,14 +260,16 @@ class _WriteArticlePageState extends State<WriteArticlePage> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: primaryGreen.withOpacity(0.1), width: 2),
-          image: (_selectedImageFile != null || _selectedImageBytes != null)
-              ? DecorationImage(
+            image: (_selectedImageFile != null || _selectedImageBytes != null)
+                ? DecorationImage(
                   image: kIsWeb ? MemoryImage(_selectedImageBytes!) : FileImage(_selectedImageFile!) as ImageProvider,
                   fit: BoxFit.cover,
                 )
+                : _existingImageUrl.isNotEmpty
+                    ? DecorationImage(image: NetworkImage(_existingImageUrl), fit: BoxFit.cover)
               : null,
         ),
-        child: (_selectedImageFile == null && _selectedImageBytes == null)
+        child: (_selectedImageFile == null && _selectedImageBytes == null && _existingImageUrl.isEmpty)
             ? Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -251,7 +305,10 @@ class _WriteArticlePageState extends State<WriteArticlePage> {
         ),
         child: _isUploading
             ? const CircularProgressIndicator(color: Colors.white)
-            : const Text("Publish Now", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          : Text(
+            widget.articleId == null ? "Publish Now" : "Save Changes",
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
       ),
     );
   }

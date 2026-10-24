@@ -1,5 +1,7 @@
-import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'dart:io';
+
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 class CloudinaryService {
@@ -17,32 +19,11 @@ class CloudinaryService {
   /// Upload image from file (mobile)
   static Future<String?> uploadImageFromFile(File imageFile) async {
     try {
-      final request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
-
-      request.fields['upload_preset'] = cloudinaryUploadPreset;
-      request.files.add(
-        http.MultipartFile(
-          'file',
-          imageFile.readAsBytes().asStream(),
-          imageFile.lengthSync(),
-          filename: imageFile.path.split('/').last,
-        ),
+      final url = await _uploadImage(
+        fileName: imageFile.path.split('/').last,
+        fileBytes: await imageFile.readAsBytes(),
       );
-
-      final response = await request.send();
-
-      if (response.statusCode == 200) {
-        final responseBody = await response.stream.bytesToString();
-        final jsonResponse = responseBody;
-        
-        // Parse JSON to get secure_url
-        if (jsonResponse.contains('"secure_url":"')) {
-          final startIndex = jsonResponse.indexOf('"secure_url":"') + 14;
-          final endIndex = jsonResponse.indexOf('"', startIndex);
-          return jsonResponse.substring(startIndex, endIndex);
-        }
-      }
-      return null;
+      return url;
     } catch (e) {
       print('Cloudinary upload error: $e');
       return null;
@@ -52,34 +33,42 @@ class CloudinaryService {
   /// Upload image from web (XFile)
   static Future<String?> uploadImageFromWeb(XFile imageFile) async {
     try {
-      final request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
-
-      request.fields['upload_preset'] = cloudinaryUploadPreset;
-      request.files.add(
-        http.MultipartFile(
-          'file',
-          imageFile.readAsBytes().asStream(),
-          await imageFile.length(),
-          filename: imageFile.name,
-        ),
+      final url = await _uploadImage(
+        fileName: imageFile.name,
+        fileBytes: await imageFile.readAsBytes(),
       );
-
-      final response = await request.send();
-
-      if (response.statusCode == 200) {
-        final responseBody = await response.stream.bytesToString();
-        
-        // Parse JSON to get secure_url
-        if (responseBody.contains('"secure_url":"')) {
-          final startIndex = responseBody.indexOf('"secure_url":"') + 14;
-          final endIndex = responseBody.indexOf('"', startIndex);
-          return responseBody.substring(startIndex, endIndex);
-        }
-      }
-      return null;
+      return url;
     } catch (e) {
       print('Cloudinary upload error: $e');
       return null;
     }
+  }
+
+  static Future<String?> _uploadImage({
+    required String fileName,
+    required List<int> fileBytes,
+  }) async {
+    final request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
+    request.fields['upload_preset'] = cloudinaryUploadPreset;
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        fileBytes,
+        filename: fileName,
+      ),
+    );
+
+    final response = await request.send();
+    if (response.statusCode != 200) {
+      return null;
+    }
+
+    final responseBody = await response.stream.bytesToString();
+    final decoded = jsonDecode(responseBody);
+    if (decoded is! Map<String, dynamic>) {
+      return null;
+    }
+
+    return decoded['secure_url']?.toString();
   }
 }

@@ -1,8 +1,24 @@
 [
   {
-    "origin": ["http://localhost:12416"],
-    "method": ["GET", "POST", "PUT", "OPTIONS"],
+    "origin": [
+      "http://localhost:1238",
+      "http://127.0.0.1:1238",
+      "http://localhost:13514",
+      "http://127.0.0.1:13514",
+      "http://localhost",
+      "http://127.0.0.1"
+    ],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
     "maxAgeSeconds": 3600,
-    "responseHeader": ["Content-Type", "Authorization"]
+    "responseHeader": [
+      "Content-Type",
+      "Authorization",
+      "Content-Length",
+      "X-Goog-Upload-Protocol",
+      "X-Goog-Upload-Command",
+      "X-Goog-Upload-Content-Length",
+      "X-Goog-Upload-Offset",
+      "x-goog-meta-*"
+    ]
   }
 ]

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 // Screens
 import '../doctor_profile.dart';
+import '../../seller/seller_profile.dart';
 import '../appointment/book_appointment.dart';
 
 class ArticleDetailPage extends StatelessWidget {
@@ -27,6 +28,12 @@ class ArticleDetailPage extends StatelessWidget {
     final String content = data['content'] ?? 'No Content Available';
     final String author = data['author'] ?? 'Unknown Author';
     final String doctorId = data['doctorId'] ?? '';
+    final String sellerId = data['sellerId']?.toString() ?? '';
+    final String ownerType = data['ownerType']?.toString().toLowerCase() ?? '';
+    final bool isSeller = ownerType == 'seller' || sellerId.isNotEmpty;
+    final bool isDoctor = ownerType == 'doctor' ||
+      (ownerType.isEmpty && sellerId.isEmpty);
+    final String profileId = isSeller && sellerId.isNotEmpty ? sellerId : doctorId;
     
     // Check both potential field names for the doctor's photo
     final String? doctorPic = data['doctorImage'] ?? data['profileImage']; 
@@ -38,6 +45,18 @@ class ArticleDetailPage extends StatelessWidget {
     if (data['createdAt'] != null) {
       DateTime dt = (data['createdAt'] as Timestamp).toDate();
       formattedDate = DateFormat('yyyy-MM-dd HH:mm').format(dt);
+    }
+
+    void openAuthorProfile() {
+      if (profileId.isEmpty) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => isSeller
+              ? SellerProfilePage(sellerId: profileId)
+              : DoctorProfilePage(doctorId: profileId),
+        ),
+      );
     }
 
     return Scaffold(
@@ -123,12 +142,8 @@ class ArticleDetailPage extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            // CLICKABLE PROFILE PHOTO to open DoctorProfilePage
                             GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => DoctorProfilePage(doctorId: doctorId)),
-                              ),
+                              onTap: openAuthorProfile,
                               child: CircleAvatar(
                                 radius: 32,
                                 backgroundColor: Colors.white,
@@ -149,15 +164,15 @@ class ArticleDetailPage extends StatelessWidget {
                                     author,
                                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: secondaryGreen),
                                   ),
-                                  const Text("Specialist Physician", style: TextStyle(fontSize: 13, color: Colors.grey)),
+                                  Text(
+                                    isSeller ? "Seller" : "Specialist Physician",
+                                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                  ),
                                 ],
                               ),
                             ),
                             IconButton(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => DoctorProfilePage(doctorId: doctorId)),
-                              ),
+                              onPressed: openAuthorProfile,
                               icon: Icon(Icons.arrow_forward_ios, size: 18, color: primaryGreen),
                             ),
                           ],
@@ -165,30 +180,31 @@ class ArticleDetailPage extends StatelessWidget {
                         const SizedBox(height: 20),
                         
                         // --- 5. Booking Action ---
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => BookAppointmentPage(
-                                  doctorId: doctorId,
-                                  doctorName: author,
+                        if (isDoctor && doctorId.isNotEmpty)
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BookAppointmentPage(
+                                    doctorId: doctorId,
+                                    doctorName: author,
+                                  ),
                                 ),
                               ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryGreen,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: const Text(
-                              "Book Appointment Now",
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primaryGreen,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: const Text(
+                                "Book Appointment Now",
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),

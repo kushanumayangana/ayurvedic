@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../admin/doctor_approval_list.dart';
 import '../admin/seller_approval_list.dart';
+import '../marketplace/app_feedback_page.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -18,13 +19,14 @@ class AdminDashboard extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
+        child: ListView(
           children: [
             // Doctor Approval Card
             Card(
               elevation: 5,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15)),
+                borderRadius: BorderRadius.circular(15),
+              ),
               child: ListTile(
                 leading: CircleAvatar(
                   backgroundColor: primaryGreen.withOpacity(0.2),
@@ -62,7 +64,8 @@ class AdminDashboard extends StatelessWidget {
                 return Card(
                   elevation: 5,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15)),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: primaryOrange.withOpacity(0.2),
@@ -79,7 +82,9 @@ class AdminDashboard extends StatelessWidget {
                         if (pending > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.red,
                               borderRadius: BorderRadius.circular(20),
@@ -87,8 +92,9 @@ class AdminDashboard extends StatelessWidget {
                             child: Text(
                               '$pending',
                               style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold),
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         const SizedBox(width: 8),
@@ -110,11 +116,44 @@ class AdminDashboard extends StatelessWidget {
 
             const SizedBox(height: 20),
 
+            Card(
+              elevation: 5,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.amber.withValues(alpha: 0.2),
+                  child: const Icon(
+                    Icons.rate_review_outlined,
+                    color: Colors.amber,
+                  ),
+                ),
+                title: const Text(
+                  "App Feedback & Reviews",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text("Read ratings and feedback from users"),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AppFeedbackInboxPage(),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
             // Optional: Quick Stats / Summary (example)
             Card(
               elevation: 3,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -122,8 +161,10 @@ class AdminDashboard extends StatelessWidget {
                   children: [
                     const Text(
                       "Quick Summary",
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     StreamBuilder<QuerySnapshot>(
@@ -132,7 +173,8 @@ class AdminDashboard extends StatelessWidget {
                           .snapshots(),
                       builder: (context, docSnapshot) {
                         int totalDoctors = 0;
-                        if (docSnapshot.hasData) totalDoctors = docSnapshot.data!.docs.length;
+                        if (docSnapshot.hasData)
+                          totalDoctors = docSnapshot.data!.docs.length;
                         return Text("Total Doctors Registered: $totalDoctors");
                       },
                     ),
@@ -142,7 +184,8 @@ class AdminDashboard extends StatelessWidget {
                           .snapshots(),
                       builder: (context, sellSnapshot) {
                         int totalSellers = 0;
-                        if (sellSnapshot.hasData) totalSellers = sellSnapshot.data!.docs.length;
+                        if (sellSnapshot.hasData)
+                          totalSellers = sellSnapshot.data!.docs.length;
                         return Text("Total Sellers Registered: $totalSellers");
                       },
                     ),

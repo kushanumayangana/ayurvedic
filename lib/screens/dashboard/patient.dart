@@ -10,6 +10,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
+import '../doctor/doctor_profile.dart';
+import '../marketplace/buyer_orders_tab.dart';
+import '../marketplace/chat_pages.dart';
+import '../seller/seller_profile.dart';
+
 class PatientDashboardPage extends StatefulWidget {
   const PatientDashboardPage({super.key});
 
@@ -61,8 +66,10 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final doc =
-        await FirebaseFirestore.instance.collection('patients').doc(user.uid).get();
+    final doc = await FirebaseFirestore.instance
+        .collection('patients')
+        .doc(user.uid)
+        .get();
 
     if (doc.exists) {
       final data = doc.data()!;
@@ -74,10 +81,31 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
     }
   }
 
+  void _openBookingProfile(Map<String, dynamic> booking) {
+    final isSellerBooking =
+        booking['bookingType'] == 'seller' ||
+        (booking['sellerId']?.toString().isNotEmpty ?? false);
+    final profileId = isSellerBooking
+        ? booking['sellerId']?.toString() ?? ''
+        : booking['doctorId']?.toString() ?? '';
+    if (profileId.isEmpty) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => isSellerBooking
+            ? SellerProfilePage(sellerId: profileId)
+            : DoctorProfilePage(doctorId: profileId),
+      ),
+    );
+  }
+
   // ================= PICK IMAGE =================
   Future<void> pickProfileImage() async {
-    final pickedFile =
-        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
 
     if (pickedFile != null) {
       if (kIsWeb) {
@@ -92,22 +120,26 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
   // ================= CLOUDINARY UPLOAD =================
   Future<String?> uploadProfileImage() async {
     if ((kIsWeb && profileImageBytes == null) ||
-        (!kIsWeb && profileImageFile == null)) return null;
+        (!kIsWeb && profileImageFile == null))
+      return null;
 
-    final uri =
-        Uri.parse("https://api.cloudinary.com/v1_1/dcbyjbtbc/image/upload");
+    final uri = Uri.parse(
+      "https://api.cloudinary.com/v1_1/dcbyjbtbc/image/upload",
+    );
 
     final request = http.MultipartRequest("POST", uri)
       ..fields["upload_preset"] = "patient_upload"
       ..fields["folder"] = "patient_profiles";
 
     if (kIsWeb && profileImageBytes != null) {
-      request.files.add(http.MultipartFile.fromBytes(
-        "file",
-        profileImageBytes!,
-        filename: "patient_${DateTime.now().millisecondsSinceEpoch}.jpg",
-        contentType: MediaType("image", "jpeg"),
-      ));
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          "file",
+          profileImageBytes!,
+          filename: "patient_${DateTime.now().millisecondsSinceEpoch}.jpg",
+          contentType: MediaType("image", "jpeg"),
+        ),
+      );
     } else if (!kIsWeb && profileImageFile != null) {
       request.files.add(
         await http.MultipartFile.fromPath("file", profileImageFile!.path),
@@ -140,21 +172,22 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
           .collection('patients')
           .doc(user.uid)
           .set({
-        'name': nameController.text.trim(),
-        'age': ageController.text.trim(),
-        if (uploadedImageUrl != null) "image": uploadedImageUrl,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+            'name': nameController.text.trim(),
+            'age': ageController.text.trim(),
+            if (uploadedImageUrl != null) "image": uploadedImageUrl,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
 
       // reload updated data
       await loadProfile();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Profile Saved ✅")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Profile Saved ✅")));
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       setState(() => loading = false);
     }
@@ -168,6 +201,21 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
       appBar: AppBar(
         title: const Text("Patient Dashboard"),
         backgroundColor: PatientDashboardPage.primaryGreen,
+        actions: [
+          IconButton(
+            tooltip: 'Messages',
+            icon: const Icon(Icons.chat_bubble_outline),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatInboxPage(
+                  userId: FirebaseAuth.instance.currentUser?.uid ?? '',
+                  accentColor: PatientDashboardPage.primaryGreen,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -181,16 +229,18 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                 backgroundColor: Colors.white,
                 backgroundImage: kIsWeb
                     ? (profileImageBytes != null
-                        ? MemoryImage(profileImageBytes!)
-                        : profileImageUrl.isNotEmpty
-                            ? NetworkImage(profileImageUrl)
-                            : null)
+                          ? MemoryImage(profileImageBytes!)
+                          : profileImageUrl.isNotEmpty
+                          ? NetworkImage(profileImageUrl)
+                          : null)
                     : (profileImageFile != null
-                        ? FileImage(File(profileImageFile!.path))
-                        : profileImageUrl.isNotEmpty
-                            ? NetworkImage(profileImageUrl)
-                            : null) as ImageProvider?,
-                child: profileImageBytes == null &&
+                              ? FileImage(File(profileImageFile!.path))
+                              : profileImageUrl.isNotEmpty
+                              ? NetworkImage(profileImageUrl)
+                              : null)
+                          as ImageProvider?,
+                child:
+                    profileImageBytes == null &&
                         profileImageFile == null &&
                         profileImageUrl.isEmpty
                     ? Icon(Icons.person, size: 55, color: Colors.grey.shade400)
@@ -254,10 +304,12 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final docs =
-                    snapshot.data!.docs.where((doc) => doc.exists).toList();
+                final docs = snapshot.data!.docs
+                    .where((doc) => doc.exists)
+                    .toList();
 
-                if (docs.isEmpty) return const Text("No appointments booked yet.");
+                if (docs.isEmpty)
+                  return const Text("No appointments booked yet.");
 
                 // Sort safely by createdAt
                 docs.sort((a, b) {
@@ -271,34 +323,63 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
-                    final data = docs[index].data() as Map<String, dynamic>? ?? {};
+                    final data =
+                        docs[index].data() as Map<String, dynamic>? ?? {};
                     final status = data['status'] ?? 'pending';
+                    final isSellerBooking =
+                        data['bookingType'] == 'seller' ||
+                        (data['sellerId']?.toString().isNotEmpty ?? false);
+                    final recipientName = isSellerBooking
+                        ? data['sellerName']?.toString() ?? 'Seller'
+                        : data['doctorName']?.toString() ?? 'Doctor';
+                    final statusColor = status == 'approved'
+                        ? Colors.green
+                        : status == 'rejected'
+                        ? Colors.red
+                        : Colors.orange;
 
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 8),
                       child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: PatientDashboardPage.primaryGreen
+                              .withOpacity(0.12),
+                          child: Icon(
+                            isSellerBooking
+                                ? Icons.storefront_outlined
+                                : Icons.medical_services_outlined,
+                            color: PatientDashboardPage.primaryGreen,
+                          ),
+                        ),
                         title: Text(
-                          "Dr. ${data['doctorName'] ?? 'Unknown'}",
+                          recipientName,
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if ((data['productTitle']?.toString().isNotEmpty ??
+                                false))
+                              Text('Item: ${data['productTitle']}'),
                             Text("Date: ${data['date'] ?? ''}"),
                             Text("Time: ${data['time'] ?? ''}"),
                             Text("Reason: ${data['reason'] ?? ''}"),
+                            const SizedBox(height: 6),
+                            Text(
+                              status.toString().toUpperCase(),
+                              style: TextStyle(
+                                color: statusColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
-                        trailing: Text(
-                          status.toUpperCase(),
-                          style: TextStyle(
-                            color: status == 'approved'
-                                ? Colors.green
-                                : status == 'rejected'
-                                    ? Colors.red
-                                    : Colors.orange,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        trailing: IconButton(
+                          tooltip: isSellerBooking
+                              ? 'View seller profile'
+                              : 'View doctor profile',
+                          onPressed: () => _openBookingProfile(data),
+                          icon: const Icon(Icons.account_circle_outlined),
                         ),
                       ),
                     );
@@ -306,6 +387,16 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                 );
               },
             ),
+            const SizedBox(height: 30),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'My Orders',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const SizedBox(height: 380, child: BuyerOrdersTab()),
           ],
         ),
       ),
