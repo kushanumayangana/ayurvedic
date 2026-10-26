@@ -47,6 +47,7 @@ class _AddProductPageState extends State<AddProductPage> {
   bool _isLoading = false;
 
   final List<String> _categories = [
+    'Balms',
     'Oils',
     'Tablets',
     'Magazines',

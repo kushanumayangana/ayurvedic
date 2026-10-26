@@ -12,6 +12,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../doctor/appointment/book_appointment.dart';
+import '../marketplace/chat_pages.dart';
 
 class DoctorProfilePage extends StatefulWidget {
   final String doctorId;
@@ -30,6 +31,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   // Controllers
   final fullName = TextEditingController();
   final specialization = TextEditingController();
+  final description = TextEditingController();
   final qualification = TextEditingController();
   final experience = TextEditingController();
   final registration = TextEditingController();
@@ -56,6 +58,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   void dispose() {
     fullName.dispose();
     specialization.dispose();
+    description.dispose();
     qualification.dispose();
     experience.dispose();
     registration.dispose();
@@ -72,8 +75,10 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
 
   // ---------- Pick Profile Image ----------
   Future<void> pickProfileImage() async {
-    final pickedFile =
-        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
     if (pickedFile != null) {
       if (kIsWeb) {
         final bytes = await pickedFile.readAsBytes();
@@ -87,25 +92,30 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   // ---------- Upload to Cloudinary ----------
   Future<String?> uploadProfileImage() async {
     if ((kIsWeb && profileImageBytes == null) ||
-        (!kIsWeb && profileImageFile == null)) return null;
+        (!kIsWeb && profileImageFile == null))
+      return null;
 
-    final uri =
-        Uri.parse("https://api.cloudinary.com/v1_1/dcbyjbtbc/image/upload");
+    final uri = Uri.parse(
+      "https://api.cloudinary.com/v1_1/dcbyjbtbc/image/upload",
+    );
     final request = http.MultipartRequest("POST", uri)
       ..fields["upload_preset"] = "doctor_upload"
       ..fields["folder"] = "doctor_profiles";
 
     if (kIsWeb && profileImageBytes != null) {
-      request.files.add(http.MultipartFile.fromBytes(
-        "file",
-        profileImageBytes!,
-        filename:
-            "doctor_profile_${DateTime.now().millisecondsSinceEpoch}.jpg",
-        contentType: MediaType("image", "jpeg"),
-      ));
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          "file",
+          profileImageBytes!,
+          filename:
+              "doctor_profile_${DateTime.now().millisecondsSinceEpoch}.jpg",
+          contentType: MediaType("image", "jpeg"),
+        ),
+      );
     } else if (!kIsWeb && profileImageFile != null) {
       request.files.add(
-          await http.MultipartFile.fromPath("file", profileImageFile!.path));
+        await http.MultipartFile.fromPath("file", profileImageFile!.path),
+      );
     }
 
     final response = await request.send();
@@ -117,12 +127,23 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
     } else {
       debugPrint("Cloudinary error: $respStr");
       throw Exception(
-          "Upload failed: Cloudinary returned ${response.statusCode}");
+        "Upload failed: Cloudinary returned ${response.statusCode}",
+      );
     }
   }
 
   // ---------- Update Profile ----------
   Future<void> updateProfile() async {
+    final about = description.text.trim();
+    if (about.length > 500) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('About me must be 500 characters or fewer'),
+        ),
+      );
+      return;
+    }
+
     setState(() => loading = true);
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
@@ -131,6 +152,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
       await FirebaseFirestore.instance.collection('doctors').doc(uid).set({
         "fullName": fullName.text.trim(),
         "specialization": specialization.text.trim(),
+        "description": about,
         "qualification": qualification.text.trim(),
         "experienceYears": experience.text.trim(),
         "registrationNumber": registration.text.trim(),
@@ -154,20 +176,26 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
           content: const Text("Profile updated successfully"),
           backgroundColor: DoctorProfilePage.primaryGreen,
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       setState(() => loading = false);
     }
   }
 
-  Widget buildIconWidget(dynamic icon,
-      {double size = 20, Color? color, double? opacity}) {
+  Widget buildIconWidget(
+    dynamic icon, {
+    double size = 20,
+    Color? color,
+    double? opacity,
+  }) {
     if (icon is FaIconData) {
       return FaIcon(
         icon,
@@ -195,23 +223,31 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
               color: DoctorProfilePage.lightGreen,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: buildIconWidget(icon,
-                size: 20, color: DoctorProfilePage.primaryGreen),
+            child: buildIconWidget(
+              icon,
+              size: 20,
+              color: DoctorProfilePage.primaryGreen,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   value.isNotEmpty ? value : 'Not specified',
                   style: TextStyle(
-                      fontSize: 15,
-                      fontWeight:
-                          value.isNotEmpty ? FontWeight.w500 : FontWeight.normal,
-                      color: value.isNotEmpty ? Colors.black87 : Colors.grey),
+                    fontSize: 15,
+                    fontWeight: value.isNotEmpty
+                        ? FontWeight.w500
+                        : FontWeight.normal,
+                    color: value.isNotEmpty ? Colors.black87 : Colors.grey,
+                  ),
                 ),
               ],
             ),
@@ -221,9 +257,14 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
     );
   }
 
-  Widget buildEditableField(String label, TextEditingController controller,
-      dynamic icon,
-      {TextInputType? type, int maxLines = 1}) {
+  Widget buildEditableField(
+    String label,
+    TextEditingController controller,
+    dynamic icon, {
+    TextInputType? type,
+    int maxLines = 1,
+    int? maxLength,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
@@ -235,19 +276,24 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
           controller: controller,
           keyboardType: type,
           maxLines: maxLines,
+          maxLength: maxLength,
           decoration: InputDecoration(
             labelText: label,
             labelStyle: const TextStyle(color: Colors.grey),
-            prefixIcon: buildIconWidget(icon,
-                color: DoctorProfilePage.primaryGreen),
+            prefixIcon: buildIconWidget(
+              icon,
+              color: DoctorProfilePage.primaryGreen,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
             ),
             filled: true,
             fillColor: Colors.white,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
           ),
         ),
       ),
@@ -263,9 +309,10 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
         Scaffold(
           backgroundColor: DoctorProfilePage.lightGreen,
           appBar: AppBar(
-            title: Text(isOwner ? "My Profile" : "Doctor Profile",
-                style:
-                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 20)),
+            title: Text(
+              isOwner ? "My Profile" : "Doctor Profile",
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+            ),
             backgroundColor: DoctorProfilePage.primaryGreen,
             foregroundColor: Colors.white,
             elevation: 0,
@@ -307,19 +354,25 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline,
-                          size: 64, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.grey.shade400,
+                      ),
                       const SizedBox(height: 16),
-                      Text('Doctor not found',
-                          style: TextStyle(
-                              fontSize: 18, color: Colors.grey.shade600)),
+                      Text(
+                        'Doctor not found',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
                     ],
                   ),
                 );
               }
 
-              final data =
-                  snapshot.data!.data() as Map<String, dynamic>? ?? {};
+              final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
 
               // FIX: Always pull the profile image so it displays in View Mode
               profileImageUrl = data['profileImage'] ?? '';
@@ -327,6 +380,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
               if (isEditing && fullName.text.isEmpty) {
                 fullName.text = data['fullName'] ?? '';
                 specialization.text = data['specialization'] ?? '';
+                description.text = data['description'] ?? '';
                 qualification.text = data['qualification'] ?? '';
                 experience.text = data['experienceYears'] ?? '';
                 registration.text = data['registrationNumber'] ?? '';
@@ -372,23 +426,28 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                                   backgroundColor: Colors.white,
                                   backgroundImage: kIsWeb
                                       ? (profileImageBytes != null
-                                          ? MemoryImage(profileImageBytes!)
-                                          : profileImageUrl.isNotEmpty
-                                              ? NetworkImage(profileImageUrl)
+                                            ? MemoryImage(profileImageBytes!)
+                                            : profileImageUrl.isNotEmpty
+                                            ? NetworkImage(profileImageUrl)
                                                   as ImageProvider
-                                              : null)
+                                            : null)
                                       : (profileImageFile != null
-                                          ? FileImage(File(profileImageFile!.path))
-                                          : profileImageUrl.isNotEmpty
-                                              ? NetworkImage(profileImageUrl)
+                                            ? FileImage(
+                                                File(profileImageFile!.path),
+                                              )
+                                            : profileImageUrl.isNotEmpty
+                                            ? NetworkImage(profileImageUrl)
                                                   as ImageProvider
-                                              : null),
-                                  child: (profileImageBytes == null &&
+                                            : null),
+                                  child:
+                                      (profileImageBytes == null &&
                                           profileImageFile == null &&
                                           profileImageUrl.isEmpty)
-                                      ? Icon(Icons.person,
+                                      ? Icon(
+                                          Icons.person,
                                           size: 55,
-                                          color: Colors.grey.shade400)
+                                          color: Colors.grey.shade400,
+                                        )
                                       : null,
                                 ),
                                 if (isOwner && isEditing)
@@ -404,14 +463,18 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                                           shape: BoxShape.circle,
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withOpacity(0.1),
+                                              color: Colors.black.withOpacity(
+                                                0.1,
+                                              ),
                                               blurRadius: 5,
                                             ),
                                           ],
                                         ),
-                                        child: Icon(Icons.camera_alt,
-                                            size: 20,
-                                            color: DoctorProfilePage.primaryGreen),
+                                        child: Icon(
+                                          Icons.camera_alt,
+                                          size: 20,
+                                          color: DoctorProfilePage.primaryGreen,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -423,52 +486,131 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                                   ? fullName.text
                                   : (data['fullName'] ?? 'Doctor Name'),
                               style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               isEditing
                                   ? specialization.text
-                                  : (data['specialization'] ?? 'Specialization'),
+                                  : (data['specialization'] ??
+                                        'Specialization'),
                               style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500),
+                                fontSize: 16,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                            const SizedBox(height: 16),
-                            if (!isOwner)
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: DoctorProfilePage.primaryGreen,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 32, vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30)),
+                            if (!isEditing) ...[
+                              const SizedBox(height: 14),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(15),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.18),
+                                  ),
                                 ),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (_) => BookAppointmentPage(
-                                              doctorId: widget.doctorId,
-                                              doctorName: data['fullName'] ?? '',
-                                            )),
-                                  );
-                                },
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(Icons.calendar_today, size: 18),
-                                    SizedBox(width: 8),
-                                    Text("Book Appointment",
-                                        style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600)),
+                                    const Text(
+                                      'ABOUT ME',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      (data['description']?.toString().trim() ??
+                                                  '')
+                                              .isEmpty
+                                          ? 'This doctor has not added a description yet.'
+                                          : data['description']
+                                                .toString()
+                                                .trim(),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        height: 1.45,
+                                        fontSize: 14,
+                                      ),
+                                    ),
                                   ],
                                 ),
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                            if (!isOwner &&
+                                FirebaseAuth.instance.currentUser != null)
+                              Wrap(
+                                alignment: WrapAlignment.center,
+                                spacing: 12,
+                                runSpacing: 10,
+                                children: [
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                      side: const BorderSide(
+                                        color: Colors.white,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 14,
+                                      ),
+                                    ),
+                                    onPressed: () => openDirectChat(
+                                      context,
+                                      otherUserId: widget.doctorId,
+                                      otherProfile: {
+                                        ...data,
+                                        'name': data['fullName'] ?? 'Doctor',
+                                        'role': 'doctor',
+                                      },
+                                      accentColor:
+                                          DoctorProfilePage.primaryGreen,
+                                    ),
+                                    icon: const Icon(Icons.chat_bubble_outline),
+                                    label: const Text('Message'),
+                                  ),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor:
+                                          DoctorProfilePage.primaryGreen,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => BookAppointmentPage(
+                                            doctorId: widget.doctorId,
+                                            doctorName:
+                                                data['fullName'] ?? '',
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(
+                                      Icons.calendar_today,
+                                      size: 18,
+                                    ),
+                                    label: const Text('Book Appointment'),
+                                  ),
+                                ],
                               ),
                           ],
                         ),
@@ -481,56 +623,139 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                         ? Column(
                             children: [
                               buildEditableField(
-                                  "Full Name", fullName, Icons.person),
-                              buildEditableField("Specialization", specialization,
-                                  Icons.medical_services),
-                              buildEditableField("Qualification", qualification,
-                                  Icons.school),
-                              buildEditableField("Experience (years)", experience,
-                                  Icons.timer),
+                                "Full Name",
+                                fullName,
+                                Icons.person,
+                              ),
                               buildEditableField(
-                                  "Registration Number", registration, Icons.confirmation_num),
-                              buildEditableField("Phone", phone, Icons.phone,
-                                  type: TextInputType.phone),
+                                "Specialization",
+                                specialization,
+                                Icons.medical_services,
+                              ),
                               buildEditableField(
-                                  "Email", email, Icons.email,
-                                  type: TextInputType.emailAddress),
+                                "About me",
+                                description,
+                                Icons.short_text,
+                                maxLines: 4,
+                                maxLength: 500,
+                              ),
                               buildEditableField(
-                                  "Whatsapp", whatsapp, FontAwesomeIcons.whatsapp),
-                              buildEditableField("Clinic Address", clinicAddress,
-                                  Icons.location_on),
-                              buildEditableField("Consultation Fee", consultationFee,
-                                  Icons.attach_money,
-                                  type: TextInputType.number),
+                                "Qualification",
+                                qualification,
+                                Icons.school,
+                              ),
                               buildEditableField(
-                                  "Available Days", availableDays, Icons.calendar_today),
+                                "Experience (years)",
+                                experience,
+                                Icons.timer,
+                              ),
                               buildEditableField(
-                                  "Available Time", availableTime, Icons.access_time),
-                              buildEditableField("Languages", languages, Icons.language),
+                                "Registration Number",
+                                registration,
+                                Icons.confirmation_num,
+                              ),
+                              buildEditableField(
+                                "Phone",
+                                phone,
+                                Icons.phone,
+                                type: TextInputType.phone,
+                              ),
+                              buildEditableField(
+                                "Email",
+                                email,
+                                Icons.email,
+                                type: TextInputType.emailAddress,
+                              ),
+                              buildEditableField(
+                                "Whatsapp",
+                                whatsapp,
+                                FontAwesomeIcons.whatsapp,
+                              ),
+                              buildEditableField(
+                                "Clinic Address",
+                                clinicAddress,
+                                Icons.location_on,
+                              ),
+                              buildEditableField(
+                                "Consultation Fee",
+                                consultationFee,
+                                Icons.attach_money,
+                                type: TextInputType.number,
+                              ),
+                              buildEditableField(
+                                "Available Days",
+                                availableDays,
+                                Icons.calendar_today,
+                              ),
+                              buildEditableField(
+                                "Available Time",
+                                availableTime,
+                                Icons.access_time,
+                              ),
+                              buildEditableField(
+                                "Languages",
+                                languages,
+                                Icons.language,
+                              ),
                             ],
                           )
                         : Column(
                             children: [
-                              buildInfoRow("Qualification",
-                                  data['qualification'] ?? '', Icons.school),
-                              buildInfoRow("Experience",
-                                  data['experienceYears'] ?? '', Icons.timer),
-                              buildInfoRow("Registration No.",
-                                  data['registrationNumber'] ?? '', Icons.confirmation_num),
-                              buildInfoRow("Phone", data['phone'] ?? '', Icons.phone),
-                              buildInfoRow("Email", data['email'] ?? '', Icons.email),
                               buildInfoRow(
-                                  "Whatsapp", data['whatsapp'] ?? '', FontAwesomeIcons.whatsapp),
-                              buildInfoRow("Clinic Address",
-                                  data['clinicAddress'] ?? '', Icons.location_on),
-                              buildInfoRow("Consultation Fee",
-                                  data['consultationFee'] ?? '', Icons.attach_money),
-                              buildInfoRow("Available Days",
-                                  data['availableDays'] ?? '', Icons.calendar_today),
-                              buildInfoRow("Available Time",
-                                  data['availableTime'] ?? '', Icons.access_time),
+                                "Qualification",
+                                data['qualification'] ?? '',
+                                Icons.school,
+                              ),
                               buildInfoRow(
-                                  "Languages", data['languages'] ?? '', Icons.language),
+                                "Experience",
+                                data['experienceYears'] ?? '',
+                                Icons.timer,
+                              ),
+                              buildInfoRow(
+                                "Registration No.",
+                                data['registrationNumber'] ?? '',
+                                Icons.confirmation_num,
+                              ),
+                              buildInfoRow(
+                                "Phone",
+                                data['phone'] ?? '',
+                                Icons.phone,
+                              ),
+                              buildInfoRow(
+                                "Email",
+                                data['email'] ?? '',
+                                Icons.email,
+                              ),
+                              buildInfoRow(
+                                "Whatsapp",
+                                data['whatsapp'] ?? '',
+                                FontAwesomeIcons.whatsapp,
+                              ),
+                              buildInfoRow(
+                                "Clinic Address",
+                                data['clinicAddress'] ?? '',
+                                Icons.location_on,
+                              ),
+                              buildInfoRow(
+                                "Consultation Fee",
+                                data['consultationFee'] ?? '',
+                                Icons.attach_money,
+                              ),
+                              buildInfoRow(
+                                "Available Days",
+                                data['availableDays'] ?? '',
+                                Icons.calendar_today,
+                              ),
+                              buildInfoRow(
+                                "Available Time",
+                                data['availableTime'] ?? '',
+                                Icons.access_time,
+                              ),
+                              buildInfoRow(
+                                "Languages",
+                                data['languages'] ?? '',
+                                Icons.language,
+                              ),
                             ],
                           ),
                     const SizedBox(height: 16),

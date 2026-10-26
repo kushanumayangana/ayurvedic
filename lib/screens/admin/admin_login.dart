@@ -2,7 +2,6 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../../firebase_emulator_config.dart';
 import '../home/home.dart';
 
 class AdminLoginScreen extends StatefulWidget {
@@ -15,9 +14,7 @@ class AdminLoginScreen extends StatefulWidget {
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController(text: 'uwuict');
-  final _secretController = TextEditingController(
-    text: useFirebaseEmulators ? '00000' : '',
-  );
+  final _secretController = TextEditingController(text: '00000');
   bool _loading = false;
   bool _obscureSecret = true;
 
@@ -34,32 +31,41 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     final username = _usernameController.text.trim();
     final secret = _secretController.text.trim();
 
-    // 1. Direct client-side bypass for uwuict / 00000
-    if (username == 'uwuict' && secret == '00000') {
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => const HomePage(role: 'admin'),
-        ),
-        (route) => false,
-      );
-      return;
-    }
-
-    // 2. Otherwise fall back to live Cloud Function authentication
     setState(() => _loading = true);
 
     try {
+      // 1. Direct client-side bypass for uwuict / 00000
+      if (username == 'uwuict' && secret == '00000') {
+        if (FirebaseAuth.instance.currentUser == null) {
+          try {
+            await FirebaseAuth.instance.signInAnonymously();
+          } catch (_) {
+            // If anonymous sign-in is disabled in your live project, 
+            // ensure you are logged into your user account in the app first.
+          }
+        }
+
+        if (!mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => const HomePage(role: 'admin'),
+          ),
+          (route) => false,
+        );
+        return;
+      }
+
+      // 2. Otherwise fall back to live Cloud Function authentication
       final callable = FirebaseFunctions.instanceFor(
         region: 'us-central1',
       ).httpsCallable('adminLogin');
-      
+
       final response = await callable.call<Map<String, dynamic>>({
         'username': username,
         'secret': secret,
       });
-      
+
       final token = response.data['customToken']?.toString();
       if (token == null || token.isEmpty) {
         throw StateError('The admin service returned no authentication token');
@@ -157,7 +163,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                         onFieldSubmitted: (_) => _login(),
                         decoration: InputDecoration(
                           labelText: 'Secret Key',
-                          prefixIcon: Icon(Icons.lock_outline),
+                          prefixIcon: const Icon(Icons.lock_outline),
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
                             tooltip: _obscureSecret

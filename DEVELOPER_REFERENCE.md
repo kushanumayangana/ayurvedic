@@ -105,19 +105,28 @@ await doc.reference.update({"status": "approved"});
 {
   "fullName": "Dr. John Smith",
   "specialization": "Ayurveda",
+  "description": "Short introduction written by the doctor (up to 500 characters)",
   "createdAt": "timestamp"
 }
 ```
+Doctors can add or edit their public introduction from their doctor profile.
+It is displayed to all roles viewing that shared profile.
 
 ### patients/{patientId}
 ```json
 {
-  "username": "patient_name",
+  "name": "Patient Name",
   "email": "patient@email.com",
   "role": "patient",
+  "age": 30,
+  "image": "https://res.cloudinary.com/...",
   "createdAt": "timestamp"
+  "updatedAt": "timestamp"
 }
 ```
+`age`, `image`, and `updatedAt` are added when the patient updates their profile.
+New patient sign-in uses email and requires email verification; `username` is only
+present on some legacy patient documents.
 
 ### articles/{articleId}
 ```json

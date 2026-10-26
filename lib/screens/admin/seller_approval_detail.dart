@@ -8,6 +8,37 @@ class SellerApprovalDetail extends StatelessWidget {
 
   final Color primaryGold = const Color(0xFFC9A441);
 
+  Future<void> _updateStatus(BuildContext context, String status) async {
+    final firestore = FirebaseFirestore.instance;
+    final batch = firestore.batch();
+    batch.update(firestore.collection('sellers').doc(sellerId), {
+      'status': status,
+      if (status == 'approved') 'approvedAt': FieldValue.serverTimestamp(),
+      if (status == 'rejected') 'rejectedAt': FieldValue.serverTimestamp(),
+    });
+    batch.update(firestore.collection('users').doc(sellerId), {
+      'isApproved': status == 'approved',
+      'isRejected': status == 'rejected',
+    });
+
+    try {
+      await batch.commit();
+    } on FirebaseException catch (error) {
+      if (!context.mounted) return;
+      final message = error.code == 'permission-denied'
+          ? 'Approval was denied. Sign in through Admin Login and confirm the updated Firebase rules are deployed.'
+          : 'Could not update seller status (${error.code}). Please try again.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update seller status: $error')),
+      );
+    }
+  }
+
   // Function to launch URL
   void _launchURL(String url) async {
     final uri = Uri.parse(url);
@@ -24,10 +55,17 @@ class SellerApprovalDetail extends StatelessWidget {
         backgroundColor: primaryGold,
       ),
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('sellers').doc(sellerId).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('sellers')
+            .doc(sellerId)
+            .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          if (!snapshot.data!.exists) return const Center(child: Text("Seller not found"));
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.data!.exists) {
+            return const Center(child: Text("Seller not found"));
+          }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
           final status = data['status'] ?? 'pending';
@@ -52,8 +90,14 @@ class SellerApprovalDetail extends StatelessWidget {
                 _buildSectionTitle("Licenses & Certificates"),
                 _buildDocumentCard("BR Certificate", data['brCertificateUrl']),
                 _buildDocumentCard("Drug License", data['drugLicenseUrl']),
-                _buildDetailRow("Drug License Number", data['drugLicenseNumber']),
-                _buildDetailRow("Drug License Expiry", data['drugLicenseExpiry']),
+                _buildDetailRow(
+                  "Drug License Number",
+                  data['drugLicenseNumber'],
+                ),
+                _buildDetailRow(
+                  "Drug License Expiry",
+                  data['drugLicenseExpiry'],
+                ),
                 const SizedBox(height: 16),
 
                 _buildSectionTitle("Status"),
@@ -71,19 +115,7 @@ class SellerApprovalDetail extends StatelessWidget {
                         icon: const Icon(Icons.check),
                         label: const Text("Approve"),
                         onPressed: status != 'approved'
-                            ? () async {
-                                await FirebaseFirestore.instance
-                                    .collection('sellers')
-                                    .doc(sellerId)
-                                    .update({
-                                  'status': 'approved',
-                                  'approvedAt': FieldValue.serverTimestamp(),
-                                });
-                                await FirebaseFirestore.instance
-                                    .collection('users')
-                                    .doc(sellerId)
-                                    .update({'isApproved': true});
-                              }
+                            ? () => _updateStatus(context, 'approved')
                             : null,
                       ),
                       ElevatedButton.icon(
@@ -93,19 +125,7 @@ class SellerApprovalDetail extends StatelessWidget {
                         icon: const Icon(Icons.cancel),
                         label: const Text("Reject"),
                         onPressed: status != 'rejected'
-                            ? () async {
-                                await FirebaseFirestore.instance
-                                    .collection('sellers')
-                                    .doc(sellerId)
-                                    .update({
-                                  'status': 'rejected',
-                                  'rejectedAt': FieldValue.serverTimestamp(),
-                                });
-                                await FirebaseFirestore.instance
-                                    .collection('users')
-                                    .doc(sellerId)
-                                    .update({'isRejected': true});
-                              }
+                            ? () => _updateStatus(context, 'rejected')
                             : null,
                       ),
                     ],
@@ -126,7 +146,10 @@ class SellerApprovalDetail extends StatelessWidget {
       child: Text(
         title,
         style: const TextStyle(
-            fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
       ),
     );
   }
@@ -138,10 +161,7 @@ class SellerApprovalDetail extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "$label: ",
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
+          Text("$label: ", style: const TextStyle(fontWeight: FontWeight.bold)),
           Expanded(
             child: Text(value != null && value != '' ? value.toString() : "-"),
           ),
@@ -188,7 +208,7 @@ class SellerApprovalDetail extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         border: Border.all(color: color),
         borderRadius: BorderRadius.circular(12),
       ),

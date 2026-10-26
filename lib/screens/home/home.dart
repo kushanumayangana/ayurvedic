@@ -7,6 +7,7 @@ import '../doctor/appointment/book_appointment.dart';
 import '../doctor/doctor_profile.dart';
 import '../doctor/articles/article_detail.dart';
 import '../marketplace/product_detail_page.dart';
+import '../marketplace/marketplace_page.dart';
 import '../seller/seller_profile.dart';
 import '../../services/app_navigation_state.dart';
 
@@ -28,16 +29,27 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   bool get isSeller => widget.role.toLowerCase() == 'seller';
-  Color get primaryGreen =>
-      isSeller ? const Color(0xFFC59D3F) : const Color(0xFF24615E);
-  Color get secondaryGreen =>
-      isSeller ? const Color(0xFF6F5520) : const Color(0xFF1B4332);
-  Color get lightBg =>
-      isSeller ? const Color(0xFFFFF8E7) : const Color(0xFFF9FBFB);
+  bool get isAdmin => widget.role.toLowerCase() == 'admin';
+  Color get primaryGreen => isSeller
+      ? const Color(0xFFC59D3F)
+      : isAdmin
+      ? const Color(0xFF1D2671)
+      : const Color(0xFF24615E);
+  Color get secondaryGreen => isSeller
+      ? const Color(0xFF6F5520)
+      : isAdmin
+      ? const Color(0xFF151B50)
+      : const Color(0xFF1B4332);
+  Color get lightBg => isSeller
+      ? const Color(0xFFFFF8E7)
+      : isAdmin
+      ? const Color(0xFFF4F5FB)
+      : const Color(0xFFF9FBFB);
 
   final ScrollController _homeScrollController = ScrollController();
   final GlobalKey _bookingSectionKey = GlobalKey();
   final GlobalKey _shopSectionKey = GlobalKey();
+  final GlobalKey _learnHubSectionKey = GlobalKey();
   final user = FirebaseAuth.instance.currentUser;
   String sellerName = 'Seller';
 
@@ -84,7 +96,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    appNavigationEnabled.value = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) appNavigationEnabled.value = true;
+    });
     _doctorsStream = FirebaseFirestore.instance
         .collection('doctors')
         .snapshots();
@@ -113,6 +127,7 @@ class _HomePageState extends State<HomePage> {
     final targetContext = switch (section) {
       1 => _shopSectionKey.currentContext,
       2 => _bookingSectionKey.currentContext,
+      3 => _learnHubSectionKey.currentContext,
       _ => null,
     };
     if (targetContext == null) return;
@@ -183,9 +198,21 @@ class _HomePageState extends State<HomePage> {
                           key: _shopSectionKey,
                           child: _sectionTitle("Market Place"),
                         ),
-                        Text(
-                          "View All",
-                          style: TextStyle(color: primaryGreen, fontSize: 12),
+                        TextButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => const MarketplacePage(),
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: primaryGreen,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          child: const Text(
+                            'View All',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
                         ),
                       ],
                     ),
@@ -204,7 +231,10 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 35),
 
                     // --- LEARN HUB SECTION ---
-                    _sectionTitle("Learn Hub"),
+                    KeyedSubtree(
+                      key: _learnHubSectionKey,
+                      child: _sectionTitle("Learn Hub"),
+                    ),
                     const SizedBox(height: 15),
                     _searchBox(
                       "Search articles...",
@@ -244,6 +274,8 @@ class _HomePageState extends State<HomePage> {
         gradient: LinearGradient(
           colors: isSeller
               ? const [Color(0xFFF5E7BF), Color(0xFFE8D39C)]
+              : isAdmin
+              ? const [Color(0xFFE8EAF6), Color(0xFFD5D9F0)]
               : const [Color(0xFFE8F1E9), Color(0xFFD2E7D6)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

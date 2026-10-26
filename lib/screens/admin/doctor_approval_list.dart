@@ -5,12 +5,15 @@ import 'doctor_approval_detail.dart';
 class DoctorApprovalList extends StatelessWidget {
   const DoctorApprovalList({super.key});
 
+  static const Color _adminBlue = Color(0xFF1D2671);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Pending Doctor Approvals"),
-        backgroundColor: Colors.green[800],
+        backgroundColor: _adminBlue,
+        foregroundColor: Colors.white,
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -54,7 +57,7 @@ class DoctorApprovalList extends StatelessWidget {
                 margin:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: ListTile(
-                  leading: const Icon(Icons.person, color: Colors.green),
+                  leading: const Icon(Icons.person, color: _adminBlue),
                   title: Text(docData['fullName'] ?? "No Name"),
                   subtitle: Text(docData['specialization'] ?? ""),
                   trailing: const Icon(Icons.arrow_forward_ios),

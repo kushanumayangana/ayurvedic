@@ -12,6 +12,7 @@ import '../screens/marketplace/app_feedback_page.dart';
 import '../screens/dashboard/patient.dart';
 import '../screens/dashboard/seller.dart';
 import '../screens/home/home.dart';
+import '../screens/marketplace/chat_pages.dart';
 import '../screens/role_select_screen.dart';
 import '../services/app_navigation_state.dart';
 
@@ -126,7 +127,11 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
   }
 
   Color get _accentColor =>
-      _role == 'seller' ? const Color(0xFFC59D3F) : const Color(0xFF24615E);
+      _role == 'seller'
+          ? const Color(0xFFC59D3F)
+          : _role == 'admin'
+          ? const Color(0xFF1D2671)
+          : const Color(0xFF24615E);
 
   void _openHome({int section = 0}) {
     final role = _role;
@@ -145,7 +150,7 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
     final userId = _userId;
     if (role == null || userId == null) return;
     appNavigationEnabled.value = true;
-    setState(() => _selectedIndex = 3);
+    setState(() => _selectedIndex = 4);
     final Widget dashboard = switch (role) {
       'doctor' => DoctorDashboardPage(doctorId: userId),
       'seller' => const SellerDashboard(),
@@ -154,6 +159,26 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
     };
     widget.navigatorKey.currentState?.pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => dashboard),
+      (route) => false,
+    );
+  }
+
+  void _openMessages() {
+    final userId = _userId;
+    if (userId == null) return;
+    appNavigationEnabled.value = true;
+    setState(() => _selectedIndex = 3);
+    widget.navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Messages'),
+            backgroundColor: _accentColor,
+            foregroundColor: Colors.white,
+          ),
+          body: ChatInboxPage(userId: userId, accentColor: _accentColor),
+        ),
+      ),
       (route) => false,
     );
   }
@@ -175,7 +200,7 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
                 Navigator.pop(sheetContext);
                 final role = _role;
                 if (role == null) return;
-                setState(() => _selectedIndex = 4);
+                setState(() => _selectedIndex = 5);
                 widget.navigatorKey.currentState?.push(
                   MaterialPageRoute<void>(
                     builder: (_) => AppFeedbackPage(role: role),
@@ -255,9 +280,12 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
                               _openHome(section: 2);
                               break;
                             case 3:
-                              _openDashboard();
+                              _openMessages();
                               break;
                             case 4:
+                              _openDashboard();
+                              break;
+                            case 5:
                               _showMore();
                               break;
                           }
@@ -277,6 +305,11 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
                             icon: Icon(Icons.calendar_month_outlined),
                             selectedIcon: Icon(Icons.calendar_month),
                             label: 'Booking',
+                          ),
+                          NavigationDestination(
+                            icon: Icon(Icons.chat_bubble_outline),
+                            selectedIcon: Icon(Icons.chat_bubble),
+                            label: 'Messages',
                           ),
                           NavigationDestination(
                             icon: Icon(Icons.dashboard_outlined),

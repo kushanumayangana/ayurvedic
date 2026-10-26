@@ -210,7 +210,7 @@ class ChatInboxPage extends StatelessWidget {
                   Text('No conversations yet'),
                   SizedBox(height: 4),
                   Text(
-                    'Start a conversation from an order.',
+                    'Start a conversation from a profile or order.',
                     style: TextStyle(color: Colors.black54),
                   ),
                 ],
@@ -328,6 +328,37 @@ Future<void> openOrderChat(
       ...order,
       ...buyerProfile,
     }, userId);
+    if (!context.mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatThreadPage(
+          conversationId: conversationId,
+          currentUserId: userId,
+          accentColor: accentColor,
+        ),
+      ),
+    );
+  } catch (error) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Could not open conversation: $error')),
+    );
+  }
+}
+
+Future<void> openDirectChat(
+  BuildContext context, {
+  required String otherUserId,
+  required Map<String, dynamic> otherProfile,
+  required Color accentColor,
+}) async {
+  final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+  try {
+    final conversationId = await ChatService.openDirectConversation(
+      otherUserId: otherUserId,
+      otherProfile: otherProfile,
+    );
     if (!context.mounted) return;
     await Navigator.push(
       context,

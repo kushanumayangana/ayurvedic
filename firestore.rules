@@ -6,6 +6,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function hasVerifiedEmail() {
+      return isLoggedIn() && request.auth.token.email_verified == true;
+    }
+
     function isOwner(userId) {
       return isLoggedIn() && request.auth.uid == userId;
     }
@@ -42,7 +46,14 @@ service cloud.firestore {
       allow read: if isDoctor(docId) || resource.data.status == "approved" || isAdmin();
       allow create: if isDoctor(docId);
       allow update: if isDoctor(docId)
-        && !('status' in request.resource.data.diff(resource.data).affectedKeys());
+        && !('status' in request.resource.data.diff(resource.data).affectedKeys())
+        && (
+          !('description' in request.resource.data.diff(resource.data).affectedKeys())
+          || (
+            request.resource.data.description is string
+            && request.resource.data.description.size() <= 500
+          )
+        );
       allow update: if isAdmin();
     }
 
@@ -60,6 +71,7 @@ service cloud.firestore {
         isAdmin()
       );
       allow create: if isLoggedIn()
+        && hasVerifiedEmail()
         && request.resource.data.get('patientId', '') == request.auth.uid
         && (request.resource.data.get('doctorId', '') != '' || request.resource.data.get('sellerId', '') != '');
       allow update: if isAdmin() || (
@@ -72,6 +84,7 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow create: if isLoggedIn()
+        && hasVerifiedEmail()
         && request.resource.data.buyerId == request.auth.uid
         && request.resource.data.ownerId != request.auth.uid
         && request.resource.data.status == 'pending'
@@ -226,7 +239,7 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
       allow read: if isAdmin()
-        || (isLoggedIn() && request.auth.uid == resource.data.userId);
+        || (isLoggedIn() && feedbackId == request.auth.uid);
       allow update: if isLoggedIn()
         && feedbackId == request.auth.uid
         && resource.data.userId == request.auth.uid
@@ -243,8 +256,30 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/customerProfileAccess/$(patientId)/vendors/$(request.auth.uid))
         && get(/databases/$(database)/documents/customerProfileAccess/$(patientId)/vendors/$(request.auth.uid)).data.orderId is string
       );
-      allow create: if isLoggedIn();
-      allow update: if isOwner(patientId) || isAdmin();
+      allow create: if isOwner(patientId)
+        && request.resource.data.keys().hasAll(['email', 'name', 'role', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['email', 'name', 'role', 'createdAt'])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.role == 'patient'
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin() || (
+        isOwner(patientId)
+        && hasVerifiedEmail()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'age', 'image', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.age is int
+        && request.resource.data.age >= 1
+        && request.resource.data.age <= 120
+        && request.resource.data.get('image', '') is string
+        && request.resource.data.get('image', '').size() <= 2048
+        && request.resource.data.updatedAt == request.time
+      );
       allow delete: if isAdmin();
     }
 
@@ -268,16 +303,30 @@ service cloud.firestore {
           && request.auth.uid in resource.data.participantIds;
       }
 
+      function hasChatProfile(userId) {
+        return exists(/databases/$(database)/documents/patients/$(userId))
+          || exists(/databases/$(database)/documents/doctors/$(userId))
+          || exists(/databases/$(database)/documents/sellers/$(userId));
+      }
+
       function isValidConversation() {
         return request.resource.data.participantIds is list
           && request.resource.data.participantIds.size() == 2
           && request.auth.uid in request.resource.data.participantIds
-          && request.resource.data.sourceOrderId is string
-          && exists(/databases/$(database)/documents/orders/$(request.resource.data.sourceOrderId))
-          && get(/databases/$(database)/documents/orders/$(request.resource.data.sourceOrderId)).data.buyerId
-            in request.resource.data.participantIds
-          && get(/databases/$(database)/documents/orders/$(request.resource.data.sourceOrderId)).data.ownerId
-            in request.resource.data.participantIds;
+          && (
+            !('sourceOrderId' in request.resource.data)
+            && hasChatProfile(request.resource.data.participantIds[0])
+            && hasChatProfile(request.resource.data.participantIds[1])
+            || (
+              request.resource.data.sourceOrderId is string
+              && request.resource.data.sourceOrderId.size() > 0
+              && exists(/databases/$(database)/documents/orders/$(request.resource.data.sourceOrderId))
+              && get(/databases/$(database)/documents/orders/$(request.resource.data.sourceOrderId)).data.buyerId
+                in request.resource.data.participantIds
+              && get(/databases/$(database)/documents/orders/$(request.resource.data.sourceOrderId)).data.ownerId
+                in request.resource.data.participantIds
+            )
+          );
       }
 
       allow create: if isLoggedIn()

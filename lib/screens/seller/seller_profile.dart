@@ -10,6 +10,8 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../marketplace/chat_pages.dart';
+
 class SellerProfilePage extends StatefulWidget {
   final String sellerId;
 
@@ -376,6 +378,37 @@ class _SellerProfilePageState extends State<SellerProfilePage> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    if (!isOwner &&
+                        FirebaseAuth.instance.currentUser != null) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => openDirectChat(
+                            context,
+                            otherUserId: widget.sellerId,
+                            otherProfile: {
+                              ...data,
+                              'name':
+                                  data['fullName'] ??
+                                  data['businessName'] ??
+                                  'Seller',
+                              'role': 'seller',
+                            },
+                            accentColor: SellerProfilePage.primaryGold,
+                          ),
+                          icon: const Icon(Icons.chat_bubble_outline),
+                          label: const Text('Message seller'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: SellerProfilePage.primaryGold,
+                            side: const BorderSide(
+                              color: SellerProfilePage.primaryGold,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     isEditing
                         ? Column(
                             children: [

@@ -186,6 +186,74 @@ class ChatService {
     return conversationId;
   }
 
+  static Future<String> openDirectConversation({
+    required String otherUserId,
+    required Map<String, dynamic> otherProfile,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw StateError('Sign in to send a message');
+    if (otherUserId.isEmpty || otherUserId == user.uid) {
+      throw StateError('This profile cannot be messaged');
+    }
+
+    final resolvedOtherProfile = await resolveParticipantProfile(
+      otherUserId,
+      otherProfile,
+    );
+    final resolvedCurrentProfile = await resolveParticipantProfile(user.uid, {
+      'name': user.displayName ?? '',
+      'image': user.photoURL ?? '',
+    });
+    final participantProfiles = <String, dynamic>{
+      user.uid: _profileRecord(
+        direct: {
+          'name': user.displayName,
+          'image': user.photoURL,
+          'role': resolvedCurrentProfile['role'],
+        },
+        fallbackName: 'Member',
+        fallbackRole: 'patient',
+        profile: resolvedCurrentProfile,
+        extraKeys: const [],
+      ),
+      otherUserId: _profileRecord(
+        direct: {
+          'name': otherProfile['name'],
+          'image': otherProfile['image'],
+          'role': otherProfile['role'],
+        },
+        fallbackName: 'Member',
+        fallbackRole: 'member',
+        profile: resolvedOtherProfile,
+        extraKeys: const [],
+      ),
+    };
+
+    final conversationId = conversationIdFor(user.uid, otherUserId);
+    final conversationRef = FirebaseFirestore.instance
+        .collection('conversations')
+        .doc(conversationId);
+
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snapshot = await transaction.get(conversationRef);
+      if (snapshot.exists) return;
+
+      transaction.set(conversationRef, {
+        'participantIds': [user.uid, otherUserId]..sort(),
+        'participantProfiles': participantProfiles,
+        'lastMessage': '',
+        'lastMessageId': '',
+        'lastMessageAt': FieldValue.serverTimestamp(),
+        'lastSenderId': '',
+        'unreadCounts': {user.uid: 0, otherUserId: 0},
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+
+    return conversationId;
+  }
+
   static Future<void> sendMessage({
     required String conversationId,
     required String text,

@@ -7,17 +7,39 @@ class SellerApprovalList extends StatelessWidget {
 
   final Color primaryGold = const Color(0xFFC9A441);
 
-  Future<void> updateStatus(String sellerId, String status) async {
-    await FirebaseFirestore.instance.collection('sellers').doc(sellerId).update({
+  Future<void> updateStatus(
+    BuildContext context,
+    String sellerId,
+    String status,
+  ) async {
+    final firestore = FirebaseFirestore.instance;
+    final batch = firestore.batch();
+    batch.update(firestore.collection('sellers').doc(sellerId), {
       'status': status,
       if (status == 'approved') 'approvedAt': FieldValue.serverTimestamp(),
       if (status == 'rejected') 'rejectedAt': FieldValue.serverTimestamp(),
     });
-
-    await FirebaseFirestore.instance.collection('users').doc(sellerId).update({
+    batch.update(firestore.collection('users').doc(sellerId), {
       'isApproved': status == 'approved',
       'isRejected': status == 'rejected',
     });
+
+    try {
+      await batch.commit();
+    } on FirebaseException catch (error) {
+      if (!context.mounted) return;
+      final message = error.code == 'permission-denied'
+          ? 'Approval was denied. Sign in through Admin Login and confirm the updated Firebase rules are deployed.'
+          : 'Could not update seller status (${error.code}). Please try again.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update seller status: $error')),
+      );
+    }
   }
 
   Widget _statusBadge(String status) {
@@ -40,12 +62,16 @@ class SellerApprovalList extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         text,
-        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12),
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -81,14 +107,20 @@ class SellerApprovalList extends StatelessWidget {
 
               return Card(
                 elevation: 3,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 margin: const EdgeInsets.only(bottom: 16),
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(16),
                   leading: CircleAvatar(
                     radius: 25,
-                    backgroundColor: primaryGold.withOpacity(0.2),
-                    child: Icon(Icons.storefront_outlined, color: primaryGold, size: 28),
+                    backgroundColor: primaryGold.withValues(alpha: 0.2),
+                    child: Icon(
+                      Icons.storefront_outlined,
+                      color: primaryGold,
+                      size: 28,
+                    ),
                   ),
                   title: Text(
                     data['businessName'] ?? 'Unknown Business',
@@ -108,15 +140,23 @@ class SellerApprovalList extends StatelessWidget {
                     spacing: 8,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.check_circle, color: Colors.green, size: 28),
+                        icon: const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                          size: 28,
+                        ),
                         onPressed: status != 'approved'
-                            ? () => updateStatus(sellerId, 'approved')
+                            ? () => updateStatus(context, sellerId, 'approved')
                             : null,
                       ),
                       IconButton(
-                        icon: const Icon(Icons.cancel, color: Colors.red, size: 28),
+                        icon: const Icon(
+                          Icons.cancel,
+                          color: Colors.red,
+                          size: 28,
+                        ),
                         onPressed: status != 'rejected'
-                            ? () => updateStatus(sellerId, 'rejected')
+                            ? () => updateStatus(context, sellerId, 'rejected')
                             : null,
                       ),
                     ],
